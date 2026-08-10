@@ -44,3 +44,4 @@ next-env.d.ts
 # local demo data
 /storage/projects.json
 /storage/uploads
+.env.local
