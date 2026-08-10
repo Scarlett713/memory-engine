@@ -155,32 +155,32 @@ export function createInitialWorkflow(): WorkflowStep[] {
   return [
     {
       key: "upload",
-      label: "涓婁紶鍙楄闊抽",
-      description: "鍙楄闊抽宸蹭笂浼犲綊妗ｏ紝绯荤粺鍑嗗杩涘叆鑷姩鏁寸悊娴佺▼銆?,
+      label: "上传受访音频",
+      description: "受访音频已上传归档，系统准备进入自动整理流程。",
       status: "completed",
     },
     {
       key: "transcription",
-      label: "楂樼簿搴﹁闊宠浆鍐?,
-      description: "璋冪敤璇煶璇嗗埆鏈嶅姟锛岃緭鍑哄彲鍥炴函鐨勫垎娈佃浆鍐欑粨鏋溿€?,
+      label: "高精度语音转写",
+      description: "调用语音识别服务，输出可回溯的分段转写结果。",
       status: "pending",
     },
     {
       key: "ai_refine",
-      label: "缁撴瀯鍖栨暣鐞嗕笌鑴辨晱",
-      description: "瀹屾垚鎽樿銆佺粨鏋勫寲鏁寸悊銆佹儏缁瘑鍒笌闅愮鑴辨晱銆?,
+      label: "结构化整理与脱敏",
+      description: "完成摘要、结构化整理、情绪识别与隐私脱敏。",
       status: "pending",
     },
     {
       key: "manual_review",
-      label: "浜哄伐瀹℃牎",
-      description: "鐮旂┒鍛樿繘琛屽鏍革紝骞跺喅瀹氭槸鍚﹁繘鍏ユ垚鏋滃鍑恒€?,
+      label: "人工审校",
+      description: "研究员进行复核，并决定是否进入成果导出。",
       status: "pending",
     },
     {
       key: "export",
-      label: "妗ｆ绾ф垚鏋滃鍑?,
-      description: "鐢熸垚鍙綊妗ｇ殑 docx銆乼xt 鍜岀粨鏋勫寲 JSON 鎴愭灉銆?,
+      label: "档案级成果导出",
+      description: "生成可归档的 docx、txt 和结构化 JSON 成果。",
       status: "pending",
     },
   ];
