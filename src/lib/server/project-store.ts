@@ -103,6 +103,8 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
     versionHistory: Array.isArray(project.versionHistory)
       ? project.versionHistory
       : [],
+    userType: project.userType || "institution",
+    consentFormPath: project.consentFormPath || "",
   };
 }
 
@@ -193,6 +195,8 @@ export async function createProject(
     sensitiveMarks: [],
     lastProcessingError: null,
     versionHistory: [],
+    userType: "institution",
+    consentFormPath: "",
   };
 
   const projects = await readProjects();

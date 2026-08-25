@@ -22,29 +22,13 @@ function getRequiredEnv(name: string) {
 }
 
 function extractOutputText(payload: {
-  output?: Array<{
-    type?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
   }>;
 }) {
-  const texts: string[] = [];
-
-  for (const item of payload.output ?? []) {
-    if (item.type !== "message") {
-      continue;
-    }
-
-    for (const contentItem of item.content ?? []) {
-      if (contentItem.type === "output_text" && contentItem.text) {
-        texts.push(contentItem.text);
-      }
-    }
-  }
-
-  return texts.join("\n").trim();
+  return payload.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 function extractJsonObject(text: string) {
@@ -219,12 +203,10 @@ function normalizeTimelineEvents(value: unknown): LlmTimelineEvent[] {
 }
 
 type ArkResponsePayload = {
-  output?: Array<{
-    type?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
   }>;
 };
 
@@ -248,15 +230,10 @@ export class ArkLlmProvider implements LlmProvider {
       body: JSON.stringify({
         model: this.model,
         stream: false,
-        input: [
+        messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: prompt,
-              },
-            ],
+            content: prompt,
           },
         ],
       }),

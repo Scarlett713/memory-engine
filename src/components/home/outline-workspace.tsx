@@ -36,6 +36,7 @@ import type {
 import { buildPrintableMarkdownDocument } from "@/lib/markdown-print";
 import { formatDateTime } from "@/lib/utils";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
+import { useAuth } from "@/hooks/useAuth";
 
 const quickPrompts = [
   "我要做一场关于老城厢生活变迁的口述访谈，请帮我先搭一个提纲。",
@@ -57,6 +58,7 @@ function createMessage(
 
 export function OutlineWorkspace() {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const fetchProjects = useProjectWorkspaceStore((state) => state.fetchProjects);
   const deleteProject = useProjectWorkspaceStore((state) => state.deleteProject);
   const projects = useProjectWorkspaceStore((state) => state.projects);
@@ -302,6 +304,27 @@ export function OutlineWorkspace() {
               <Plus className="h-4 w-4" />
             </button>
           </div>
+
+          {/* 用户信息 */}
+          {user && (
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-stone-700" title={user.email}>
+                  {user.email}
+                </p>
+                <p className="text-[10px] text-stone-400">
+                  {user.userType === 'personal' ? '个人版' : '机构版'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className="ml-2 shrink-0 text-[11px] text-stone-400 hover:text-red-500 transition-colors"
+              >
+                退出
+              </button>
+            </div>
+          )}
 
           <div className="mt-4 grid gap-2">
             <button
