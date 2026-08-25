@@ -29,6 +29,8 @@ import type {
   RedactionRule,
 } from "@/lib/types/project";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
+import { useAuth } from "@/hooks/useAuth";
+import { useDeviceType } from "@/hooks/useDeviceType";
 
 const acceptedAudioExtensions = ".mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,audio/*";
 const defaultRules: RedactionRule[] = [
@@ -58,6 +60,8 @@ function readStoredOutlineSession() {
 
 export function InterviewUploadForm() {
   const router = useRouter();
+  const { user } = useAuth();
+  const deviceType = useDeviceType();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
   const isSubmitting = useProjectWorkspaceStore((state) => state.isSubmitting);
@@ -155,6 +159,154 @@ export function InterviewUploadForm() {
           : "上传失败，请稍后重试。",
       );
     }
+  }
+
+
+  // ── 个人端极简表单（移动端）──────────────────────────────
+  const [simpleIntervieweeName, setSimpleIntervieweeName] = useState('');
+  const [simpleRelation, setSimpleRelation] = useState('grandparent');
+
+  const relationOptions = [
+    { value: 'grandparent', label: '祖父母 / 外祖父母' },
+    { value: 'parent', label: '父母' },
+    { value: 'spouse', label: '配偶' },
+    { value: 'sibling', label: '兄弟姐妹' },
+    { value: 'friend', label: '朋友 / 邻居' },
+    { value: 'other', label: '其他' },
+  ];
+
+  async function handleSimpleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!simpleIntervieweeName.trim()) {
+      setError('请填写受访者的称呼。');
+      return;
+    }
+    if (!audioFile) {
+      setError('请先选择一段音频。');
+      return;
+    }
+    try {
+      setError(null);
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+      const project = await createProject({
+        audioFile,
+        intervieweeName: simpleIntervieweeName.trim(),
+        projectName: `${simpleIntervieweeName.trim()}的口述回忆 · ${yearMonth}`,
+        institutionName: '',
+        collectionScenario: 'family_memory',
+        researchFocus: relationOptions.find(o => o.value === simpleRelation)?.label || '',
+        privacyLevel: 'standard',
+        customRedactionRules: defaultRules,
+        customScenarioLabel: '',
+        notes: '',
+        outlineDraftMarkdown: '',
+      });
+      router.push(`/projects/${project.id}?autostart=1`);
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error ? submitError.message : '上传失败，请稍后重试。'
+      );
+    }
+  }
+
+  // 移动端个人用户 → 极简版
+  if (deviceType === 'mobile' && user?.userType === 'personal') {
+    return (
+      <section className="archive-frame paper-panel paper-panel-strong h-full min-h-0 rounded-[1.85rem] p-5">
+        <div className="mb-5">
+          <p className="section-eyebrow">上传音频</p>
+          <h2 className="font-display mt-2 text-2xl font-semibold text-accent-strong">
+            记录这段回忆
+          </h2>
+        </div>
+
+        <form className="soft-scroll space-y-4 overflow-auto" onSubmit={handleSimpleSubmit}>
+          {error && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
+          {/* 受访者称呼 */}
+          <div>
+            <label className="field-label" htmlFor="simpleIntervieweeName">
+              受访者的称呼
+            </label>
+            <input
+              id="simpleIntervieweeName"
+              className="text-field"
+              value={simpleIntervieweeName}
+              onChange={(e) => setSimpleIntervieweeName(e.target.value)}
+              placeholder="例如：外婆、王爷爷"
+              required
+            />
+          </div>
+
+          {/* 与受访者关系 */}
+          <div>
+            <label className="field-label" htmlFor="simpleRelation">
+              TA 和你的关系
+            </label>
+            <select
+              id="simpleRelation"
+              className="text-field"
+              value={simpleRelation}
+              onChange={(e) => setSimpleRelation(e.target.value)}
+            >
+              {relationOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 音频上传区 */}
+          <div>
+            <label className="field-label">上传音频</label>
+            <div
+              className="mt-1 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50 px-4 py-8 text-center"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {audioFile ? (
+                <div className="space-y-1">
+                  <AudioLines className="mx-auto h-6 w-6 text-accent-strong" />
+                  <p className="text-sm font-medium text-stone-700">{audioFile.name}</p>
+                  <p className="text-xs text-stone-400">
+                    {(audioFile.size / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <UploadCloud className="mx-auto h-8 w-8 text-stone-300" />
+                  <p className="text-sm text-stone-500">点击选择音频文件</p>
+                  <p className="text-xs text-stone-400">支持 MP3、WAV、M4A 等格式</p>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={acceptedAudioExtensions}
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="send-pill w-full justify-center"
+          >
+            {isSubmitting ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <UploadCloud className="h-4 w-4" />
+            )}
+            {isSubmitting ? '上传中…' : '开始整理这段回忆'}
+          </button>
+        </form>
+      </section>
+    );
   }
 
   return (
