@@ -168,7 +168,7 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
         code?: string | number;
         descInfo?: string;
         content?: {
-          orderInfo?: { status?: number };
+          orderInfo?: { status?: number; failType?: number };
           orderResult?: string;
         };
       };
@@ -184,7 +184,26 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
 
       // status: 0=排队中 1=处理中 4=完成 -1=失败（讯飞 raasr v2 实测）
     if (status === -1) {
-        throw new Error("讯飞转写任务失败，请检查音频文件格式是否支持。");
+        const failType = payload.content?.orderInfo?.failType;
+        const failTypeHint =
+          failType === 2
+            ? "音频转码失败"
+            : failType === 3
+              ? "音频识别失败"
+              : failType === 4
+                ? "音频时长超限（最大5小时）"
+                : failType === 6
+                  ? "静音文件"
+                  : failType === 7
+                    ? "翻译失败"
+                    : failType === 99
+                      ? "其他原因"
+                      : "";
+        throw new Error(
+          failTypeHint
+            ? `讯飞转写任务失败（failType=${failType}：${failTypeHint}）。`
+            : "讯飞转写任务失败，请检查音频文件格式是否支持。",
+        );
     }
 
     if (status === 4) {
@@ -195,7 +214,7 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
         return this.parseResult(orderResult);
       }
 
-      // status 0/1：继续等待
+      // status 0/1/3：排队或处理中，继续轮询
     }
 
     throw new Error("讯飞转写超时（5分钟），请稍后重试。");

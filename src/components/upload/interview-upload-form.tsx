@@ -58,6 +58,44 @@ function readStoredOutlineSession() {
   }
 }
 
+function ConsentNotice({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="surface-card rounded-[1.55rem] border-2 border-emerald-500/40 p-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-5 w-5 text-emerald-600" />
+        <p className="section-eyebrow">知情同意确认</p>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-muted">
+        本平台会对本次口述音频进行本地转写、AI 整理与隐私脱敏处理，处理结果仅用于研究 / 归档目的。上传前，请确认您已向受访者完整说明上述用途。
+        <span className="text-stone-400">（占位文案，待姚婷婷提供正式文案后替换）</span>
+      </p>
+      <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[1.15rem] border border-emerald-500/30 bg-white/60 p-3.5 text-sm leading-6 text-foreground">
+        <input
+          type="checkbox"
+          className="mt-1 h-4 w-4 shrink-0 accent-emerald-600"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span>
+          我确认已获得受访者的口头或书面知情同意，受访者已了解本次口述内容将被录音、转写、AI
+          整理，并同意在脱敏处理后用于研究 / 归档目的。
+        </span>
+      </label>
+      {!checked ? (
+        <p className="mt-2.5 text-xs leading-5 text-muted">
+          请先勾选知情同意确认，才能上传并开始 AI 处理。
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function InterviewUploadForm() {
   const router = useRouter();
   const { user } = useAuth();
@@ -86,6 +124,7 @@ export function InterviewUploadForm() {
   );
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [consentChecked, setConsentChecked] = useState(false);
 
   const helperText = useMemo(() => {
     if (!audioFile) {
@@ -223,6 +262,8 @@ export function InterviewUploadForm() {
         </div>
 
         <form className="soft-scroll space-y-4 overflow-auto" onSubmit={handleSimpleSubmit}>
+          <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
+
           {error && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
@@ -295,7 +336,7 @@ export function InterviewUploadForm() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !consentChecked}
             className="send-pill w-full justify-center"
           >
             {isSubmitting ? (
@@ -340,6 +381,8 @@ export function InterviewUploadForm() {
         className="soft-scroll mt-5 h-[calc(100%-5.4rem)] space-y-4 overflow-auto pr-1"
         onSubmit={handleSubmit}
       >
+        <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
+
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="xl:col-span-2">
             <label className="field-label" htmlFor="projectName">
@@ -583,7 +626,7 @@ export function InterviewUploadForm() {
           <Button
             type="submit"
             className="min-w-[220px] justify-center"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !consentChecked}
           >
             {isSubmitting ? (
               <>
