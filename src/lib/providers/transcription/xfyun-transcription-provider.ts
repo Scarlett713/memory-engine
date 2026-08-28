@@ -182,7 +182,7 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
 
       const status = payload.content?.orderInfo?.status;
 
-      // status: 0=排队中 1=处理中 2=完成 3=失败
+      // status: 0=排队中 1=处理中 4=完成 -1=失败（讯飞 raasr v2 实测）
     if (status === -1) {
         throw new Error("讯飞转写任务失败，请检查音频文件格式是否支持。");
     }
