@@ -151,6 +151,7 @@ export function InterviewUploadForm() {
         customRedactionRules,
       });
 
+      router.refresh();
       router.push(`/projects/${project.id}?autostart=1`);
     } catch (submitError) {
       setError(
@@ -356,6 +357,7 @@ export function InterviewUploadForm() {
           <div>
             <label className="field-label" htmlFor="intervieweeName">
               受访对象
+              <span className="ml-1 text-red-500">*</span>
             </label>
             <input
               id="intervieweeName"

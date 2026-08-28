@@ -166,7 +166,9 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
           </div>
         ) : null}
 
-        <ProjectExportPanel project={project} />
+        {project.status !== "ready_to_export" && (
+          <ProjectExportPanel project={project} />
+        )}
       </div>
     </section>
   );

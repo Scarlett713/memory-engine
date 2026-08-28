@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-
-import { deleteProject, getProjectById } from "@/lib/server/project-store";
+import { NextRequest, NextResponse } from "next/server";
+import { deleteProject, getProjectById, updateProject } from "@/lib/server/project-store";
 
 type RouteContext = {
   params: Promise<{
@@ -30,4 +29,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  const { projectId } = await context.params;
+
+  try {
+    const body = await request.json() as Partial<import("@/lib/types/project").ProjectRecord>;
+    const updated = await updateProject(projectId, body);
+
+    if (!updated) {
+      return NextResponse.json({ message: "未找到项目。" }, { status: 404 });
+    }
+
+    return NextResponse.json({ project: updated });
+  } catch {
+    return NextResponse.json({ message: "更新失败，请稍后重试。" }, { status: 500 });
+  }
 }

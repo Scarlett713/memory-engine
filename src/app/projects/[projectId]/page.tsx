@@ -12,10 +12,7 @@ import { ProjectOverviewPanel } from "@/components/projects/project-overview-pan
 import { ProjectProcessingConsole } from "@/components/projects/project-processing-console";
 import { ProjectWorkflowBoard } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  getInterviewScenarioLabel,
-  getPrivacyLevelLabel,
-} from "@/lib/oral-history";
+import { getInterviewScenarioLabel } from "@/lib/oral-history";
 import { getProjectById } from "@/lib/server/project-store";
 import { formatDateTime } from "@/lib/utils";
 
@@ -90,7 +87,7 @@ export default async function ProjectDetailPage({
               </div>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-2 md:grid-cols-3">
               <div className="surface-card rounded-[1.2rem] px-4 py-3">
                 <span className="section-eyebrow">受访对象</span>
                 <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -106,24 +103,10 @@ export default async function ProjectDetailPage({
                 </p>
               </div>
               <div className="surface-card rounded-[1.2rem] px-4 py-3">
-                <span className="section-eyebrow">整理机构</span>
-                <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Building2 className="h-4 w-4 text-accent-strong" />
-                  {project.institutionName || "未填写"}
-                </p>
-              </div>
-              <div className="surface-card rounded-[1.2rem] px-4 py-3">
                 <span className="section-eyebrow">建档时间</span>
                 <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                   <CalendarClock className="h-4 w-4 text-accent-strong" />
                   {formatDateTime(project.createdAt)}
-                </p>
-              </div>
-              <div className="surface-card rounded-[1.2rem] px-4 py-3">
-                <span className="section-eyebrow">脱敏级别</span>
-                <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <StatusBadge status={project.status} />
-                  <span>{getPrivacyLevelLabel(project.privacyLevel)}</span>
                 </p>
               </div>
             </div>

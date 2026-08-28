@@ -31,19 +31,14 @@ export function ProjectWorkflowBoard({
 }: ProjectWorkflowBoardProps) {
   return (
     <section className="paper-panel rounded-[1.85rem] p-4 md:p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="section-eyebrow">处理进度</p>
-          <h2 className="font-display mt-2 text-[1.7rem] font-semibold text-accent-strong md:text-[2rem]">
-            自动处理链路
-          </h2>
-        </div>
-        <p className="max-w-xl text-sm leading-6 text-muted">
-          上传音频后，系统会自动完成转写、AI整理与人工审校准备。
+      <div className="flex items-center justify-between gap-3">
+        <p className="section-eyebrow">自动处理链路</p>
+        <p className="text-xs leading-5 text-muted">
+          上传后自动完成转写、AI整理与审校准备
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
         {workflow.map((step, index) => {
           const Icon = iconMap[step.key];
           const isCompleted = step.status === "completed";

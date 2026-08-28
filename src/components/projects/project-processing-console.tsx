@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  CheckCircle2,
+  Download,
   FileText,
   LoaderCircle,
   Maximize2,
+  PenLine,
   ScanText,
   ShieldAlert,
   Sparkles,
@@ -348,6 +351,71 @@ export function ProjectProcessingConsole({
     setCurrentProject(project);
   }, [project]);
 
+
+  // ── 确认审校完成 ─────────────────────────────────────────
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleConfirmReview = useCallback(async () => {
+    setIsConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+        status: 'ready_to_export',
+        workflow: currentProject.workflow.map((step) =>
+          step.key === 'manual_review'
+            ? { ...step, status: 'completed' as const }
+            : step.key === 'export'
+              ? { ...step, status: 'pending' as const }
+              : step
+        ),
+      }),
+      });
+      const data = await res.json() as { project?: typeof project; message?: string };
+      if (!res.ok) throw new Error(data.message ?? '操作失败');
+      if (data.project) setCurrentProject(data.project);
+      router.refresh();
+    } catch (e) {
+      setConfirmError(e instanceof Error ? e.message : '操作失败，请重试');
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [project.id, router, currentProject]);
+
+  const handleExport = useCallback(async (format: 'docx' | 'txt' | 'json') => {
+    setExportingFormat(format);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/export?format=${format}`);
+      if (!res.ok) {
+        const data = await res.json() as { message?: string };
+        throw new Error(data.message ?? '导出失败');
+      }
+      const blob = await res.blob();
+      const header = res.headers.get('Content-Disposition');
+      const utf8Match = header?.match(/filename\*=UTF-8''([^;]+)/i);
+      const basicMatch = header?.match(/filename="?([^"]+)"?/i);
+      const fileName = utf8Match?.[1]
+        ? decodeURIComponent(utf8Match[1])
+        : basicMatch?.[1] ?? `archive.${format}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      router.refresh();
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : '导出失败，请重试');
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [project.id, router]);
+
   const handleProcess = useCallback(
     (cleanupUrl = false) => {
       setError(null);
@@ -509,6 +577,87 @@ export function ProjectProcessingConsole({
             </div>
           ) : null}
 
+
+          {/* ── 待审校：引导卡片 ── */}
+          {hasResults && currentProject.status === 'manual_review' ? (
+            <div className="mb-4 rounded-[1.4rem] border border-success/25 bg-success/8 p-5">
+              <div className="flex items-start gap-3">
+                <PenLine className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    AI 整理已完成 · 请确认审校结果
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted">
+                    查看下方整理结果，有需要可放大修改；确认无误后点击「完成审校」解锁导出。
+                  </p>
+                  {confirmError && (
+                    <p className="mt-2 text-xs text-red-500">{confirmError}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(true)}
+                      className="inline-flex items-center gap-2 rounded-full bg-white/70 border border-line/60 px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-white"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      放大查看 / 修改
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmReview}
+                      disabled={isConfirming}
+                      className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-success/90 disabled:opacity-50"
+                    >
+                      {isConfirming ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── 已完成审校：内嵌导出面板 ── */}
+          {currentProject.status === 'ready_to_export' ? (
+            <div className="mb-4 rounded-[1.4rem] border border-accent-soft bg-accent-soft/30 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                <p className="text-sm font-semibold text-foreground">审校已完成 · 选择格式导出</p>
+              </div>
+              {exportError && (
+                <p className="mb-3 text-xs text-red-500">{exportError}</p>
+              )}
+              <div className="grid gap-2">
+                {(['docx', 'txt', 'json'] as const).map((fmt) => {
+                  const labels = { docx: '导出 Word 档案稿 (.docx)', txt: '导出纯文本 (.txt)', json: '导出结构化数据 (.json)' };
+                  const isExporting = exportingFormat === fmt;
+                  return (
+                    <button
+                      key={fmt}
+                      type="button"
+                      onClick={() => handleExport(fmt)}
+                      disabled={exportingFormat !== null}
+                      className={`flex items-center justify-between rounded-[1rem] px-4 py-3 text-sm font-medium transition-colors disabled:opacity-50
+                        ${fmt === 'docx'
+                          ? 'bg-accent-strong text-white hover:bg-accent-strong/90'
+                          : 'bg-white/70 border border-line/60 text-foreground hover:bg-white'}`}
+                    >
+                      <span>{labels[fmt]}</span>
+                      {isExporting
+                        ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                        : <Download className="h-4 w-4" />
+                      }
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {hasResults ? <ResultGrid project={currentProject} /> : null}
         </div>
       </section>
@@ -529,6 +678,19 @@ export function ProjectProcessingConsole({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {currentProject.status === 'manual_review' ? (
+                    <button
+                      type="button"
+                      onClick={async () => { await handleConfirmReview(); setIsExpanded(false); }}
+                      disabled={isConfirming}
+                      className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-2 text-sm font-semibold text-white hover:bg-success/90 disabled:opacity-50 transition-colors"
+                    >
+                      {isConfirming
+                        ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                        : <CheckCircle2 className="h-4 w-4" />}
+                      {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+                    </button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="secondary"

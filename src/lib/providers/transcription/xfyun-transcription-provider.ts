@@ -108,8 +108,6 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
     const { ts, signa } = this.buildAuthParams();
     const fileBuffer = await readFile(input.filePath);
 
-    console.log("[xfyun] filePath:", input.filePath);
-    console.log("[xfyun] fileBuffer size:", fileBuffer.length);
 
     const params = new URLSearchParams({
         appId: this.appId,
@@ -134,7 +132,6 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
         content?: { orderId?: string };
     };
 
-    console.log("[xfyun] upload response:", JSON.stringify(payload));
 
     if (String(payload.code) !== "000000" || !payload.content?.orderId) {
         throw new Error(
@@ -176,7 +173,6 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
         };
       };
 
-      console.log(`[xfyun] poll attempt ${attempt + 1}:`, JSON.stringify(payload));
 
       if (String(payload.code) !== "000000") {
         throw new Error(
