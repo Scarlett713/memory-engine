@@ -388,6 +388,13 @@ export function ProjectProcessingConsole({
   }, [project.id, router, currentProject]);
 
   const handleExport = useCallback(async (format: 'docx' | 'txt' | 'json') => {
+    if (
+      project.emotionalSignals?.some((s) => s.level === "high") &&
+      !window.confirm("检测到受访者在本段访谈中情绪较为激动，是否确认导出？")
+    ) {
+      return;
+    }
+
     setExportingFormat(format);
     setExportError(null);
     try {
