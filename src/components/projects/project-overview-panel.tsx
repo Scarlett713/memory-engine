@@ -66,10 +66,12 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             <h3 className="text-base font-semibold text-foreground">基础信息</h3>
           </div>
           <dl className="mt-4 space-y-3 text-sm leading-6 text-muted">
-            <div>
-              <dt className="font-medium text-foreground">整理机构</dt>
-              <dd>{project.institutionName || "未填写"}</dd>
-            </div>
+            {project.institutionName && (
+              <div>
+                <dt className="font-medium text-foreground">整理机构</dt>
+                <dd>{project.institutionName}</dd>
+              </div>
+            )}
             <div>
               <dt className="font-medium text-foreground">口述场景</dt>
               <dd>

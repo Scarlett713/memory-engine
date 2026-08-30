@@ -357,7 +357,9 @@ export function InterviewUploadForm() {
         <div>
           <p className="section-eyebrow">Step 02</p>
           <h2 className="font-display mt-2 text-[1.8rem] font-semibold text-accent-strong md:text-[2.15rem]">
-            上传受访音频
+            {user?.userType === "personal"
+              ? "上传受访音频"
+              : "上传受访音频 · 机构采集"}
           </h2>
         </div>
 
@@ -411,18 +413,20 @@ export function InterviewUploadForm() {
             />
           </div>
 
-          <div>
-            <label className="field-label" htmlFor="institutionName">
-              整理机构
-            </label>
-            <input
-              id="institutionName"
-              className="text-field"
-              value={institutionName}
-              onChange={(event) => setInstitutionName(event.target.value)}
-              placeholder="例如：城市口述历史工作站"
-            />
-          </div>
+          {user?.userType !== "personal" && (
+            <div>
+              <label className="field-label" htmlFor="institutionName">
+                整理机构
+              </label>
+              <input
+                id="institutionName"
+                className="text-field"
+                value={institutionName}
+                onChange={(event) => setInstitutionName(event.target.value)}
+                placeholder="例如：城市口述历史工作站"
+              />
+            </div>
+          )}
 
           <div>
             <label className="field-label" htmlFor="collectionScenario">
