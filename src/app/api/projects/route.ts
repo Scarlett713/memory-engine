@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     const privacyLevel =
       (formData.get("privacyLevel")?.toString().trim() as PrivacyLevel) ||
       "standard";
+    const language = formData.get("language")?.toString().trim() ?? "";
     const customRedactionRules = parseCustomRedactionRules(
       formData.get("customRedactionRules"),
     );
@@ -136,6 +137,7 @@ export async function POST(request: Request) {
       collectionScenario,
       researchFocus,
       privacyLevel,
+      language: language || "cn",
       customRedactionRules,
       userId,
       userType,

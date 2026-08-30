@@ -40,6 +40,16 @@ const defaultRules: RedactionRule[] = [
   "contact_account",
 ];
 
+// 讯飞转写 language 参数取值（方言识别）
+const languageOptions = [
+  { value: "cn", label: "普通话（默认）" },
+  { value: "en", label: "英语" },
+  { value: "cn_cantonese", label: "粤语" },
+  { value: "cn_sichuan", label: "四川话" },
+  { value: "cn_shanghai", label: "上海话" },
+  { value: "cn_henanese", label: "河南话" },
+];
+
 function readStoredOutlineSession() {
   if (typeof window === "undefined") {
     return null;
@@ -125,6 +135,7 @@ export function InterviewUploadForm() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [language, setLanguage] = useState("cn");
 
   const helperText = useMemo(() => {
     if (!audioFile) {
@@ -188,6 +199,7 @@ export function InterviewUploadForm() {
         researchFocus: researchFocus.trim(),
         privacyLevel,
         customRedactionRules,
+        language,
       });
 
       router.refresh();
@@ -241,6 +253,7 @@ export function InterviewUploadForm() {
         customScenarioLabel: '',
         notes: '',
         outlineDraftMarkdown: '',
+        language,
       });
       router.push(`/projects/${project.id}?autostart=1`);
     } catch (submitError) {
@@ -297,6 +310,23 @@ export function InterviewUploadForm() {
               onChange={(e) => setSimpleRelation(e.target.value)}
             >
               {relationOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 音频语言 / 方言 */}
+          <div>
+            <label className="field-label" htmlFor="simpleLanguage">
+              音频语言 / 方言
+            </label>
+            <select
+              id="simpleLanguage"
+              className="text-field"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              {languageOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
@@ -441,6 +471,24 @@ export function InterviewUploadForm() {
               }
             >
               {interviewScenarioOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="language">
+              音频语言 / 方言
+            </label>
+            <select
+              id="language"
+              className="text-field"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value)}
+            >
+              {languageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

@@ -116,6 +116,7 @@ export class XfyunTranscriptionProvider implements TranscriptionProvider {
         fileSize: fileBuffer.length.toString(),
         fileName: input.fileName,
         duration: "0",
+        language: input.language || "cn",
     });
 
     const response = await fetch(`${this.uploadUrl}?${params}`, {

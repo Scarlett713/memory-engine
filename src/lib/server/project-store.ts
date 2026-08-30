@@ -31,6 +31,7 @@ type CreateProjectInput = {
   customRedactionRules: RedactionRule[];
   userId: string;
   userType: UserType;
+  language?: string;
 };
 
 function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord {
@@ -59,6 +60,7 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
       : createInitialWorkflow(),
     collectionScenario,
     researchFocus,
+    language: project.language || "",
     privacyLevel: project.privacyLevel || "standard",
     customRedactionRules: Array.isArray(project.customRedactionRules)
       ? project.customRedactionRules
@@ -186,6 +188,7 @@ export async function createProject(
     workflow: createInitialWorkflow(),
     collectionScenario: input.collectionScenario,
     researchFocus: input.researchFocus,
+    language: input.language,
     privacyLevel: input.privacyLevel,
     customRedactionRules: input.customRedactionRules,
     collectionPlan: buildCollectionPlan({

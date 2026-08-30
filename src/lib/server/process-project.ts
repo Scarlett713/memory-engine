@@ -63,6 +63,7 @@ export async function processProject(projectId: string) {
       fileName: project.audioFileName,
       filePath: absoluteAudioPath,
       sourceUrl,
+      language: project.language,
     });
     const processedTranscription = postProcessTranscriptionResult(
       transcriptionResult,

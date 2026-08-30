@@ -21,6 +21,7 @@ type CreateProjectPayload = {
   researchFocus: string;
   privacyLevel: PrivacyLevel;
   customRedactionRules: RedactionRule[];
+  language: string;
 };
 
 type ProjectWorkspaceState = {
@@ -84,6 +85,7 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
       formData.set("collectionScenario", payload.collectionScenario);
       formData.set("researchFocus", payload.researchFocus);
       formData.set("privacyLevel", payload.privacyLevel);
+      formData.set("language", payload.language || "cn");
       formData.set(
         "customRedactionRules",
         JSON.stringify(payload.customRedactionRules),

@@ -158,6 +158,7 @@ export type ProjectRecord = {
   intervieweeRelation?: string;
   interviewOccasion?: InterviewOccasion;
   expectedOutput?: ExpectedOutput;
+  language?: string;
   projectCode?: string;
   estimatedDuration?: number;
   versionHistory: VersionSnapshot[];

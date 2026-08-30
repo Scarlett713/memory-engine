@@ -4,6 +4,7 @@ export type TranscriptionInput = {
   filePath: string;
   fileName: string;
   sourceUrl?: string;
+  language?: string;
 };
 
 export type TranscriptionResult = {
