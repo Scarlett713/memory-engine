@@ -1,6 +1,7 @@
 import { getInterviewScenarioLabel } from "@/lib/oral-history";
 import { normalizeOutlineProfile } from "@/lib/outline-session";
 import type {
+  LlmAskResult,
   LlmOutlineChatInput,
   LlmProvider,
   LlmRefineInput,
@@ -74,6 +75,13 @@ function getMissingPrompt(input: LlmOutlineChatInput) {
 }
 
 export class MockLlmProvider implements LlmProvider {
+  async askQuestion(prompt: string): Promise<LlmAskResult> {
+    return {
+      answer:
+        "（Mock 模式）当前为模拟问答环境，暂不基于访谈内容作答。配置 LLM_PROVIDER=ark 与 LLM_API_KEY 后即可获得真实回答。",
+    };
+  }
+
   async refineTranscript(input: LlmRefineInput): Promise<LlmRefineResult> {
     return {
       provider: "mock",

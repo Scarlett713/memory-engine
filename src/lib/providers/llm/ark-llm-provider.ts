@@ -1,5 +1,6 @@
 import { normalizeOutlineProfile } from "@/lib/outline-session";
 import type {
+  LlmAskResult,
   LlmEmotionSignal,
   LlmOutlineChatInput,
   LlmProvider,
@@ -246,6 +247,10 @@ export class ArkLlmProvider implements LlmProvider {
 
     const payload = (await response.json()) as ArkResponsePayload;
     return extractOutputText(payload);
+  }
+
+  async askQuestion(prompt: string): Promise<LlmAskResult> {
+    return { answer: await this.requestOutputText(prompt) };
   }
 
   async refineTranscript(input: LlmRefineInput): Promise<LlmRefineResult> {

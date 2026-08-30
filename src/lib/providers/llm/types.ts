@@ -59,9 +59,14 @@ export type LlmOutlineChatInput = {
   currentOutline: string;
 };
 
+export type LlmAskResult = {
+  answer: string;
+};
+
 export interface LlmProvider {
   refineTranscript(input: LlmRefineInput): Promise<LlmRefineResult>;
   generateInterviewOutline(
     input: LlmOutlineChatInput,
   ): Promise<OutlineChatResult>;
+  askQuestion(prompt: string): Promise<LlmAskResult>;
 }

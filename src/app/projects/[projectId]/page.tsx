@@ -11,6 +11,7 @@ import {
 
 import { ProjectOverviewPanel } from "@/components/projects/project-overview-panel";
 import { ProjectProcessingConsole } from "@/components/projects/project-processing-console";
+import { ProjectQAPanel } from "@/components/projects/project-qa-panel";
 import { ProjectWorkflowBoard } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getInterviewScenarioLabel } from "@/lib/oral-history";
@@ -119,12 +120,16 @@ export default async function ProjectDetailPage({
         </section>
 
         <div className="grid min-h-0 gap-2 xl:grid-cols-[1.28fr_0.9fr] xl:items-stretch">
-          <div className="grid min-h-0 gap-2 xl:grid-rows-[auto_minmax(0,1fr)]">
+          <div className="grid min-h-0 gap-2 xl:grid-rows-[auto_minmax(0,1fr)_auto]">
             <ProjectWorkflowBoard workflow={project.workflow} />
             <ProjectProcessingConsole
               project={project}
               autoStart={autostart === "1"}
             />
+            {project.status === "manual_review" ||
+            project.status === "ready_to_export" ? (
+              <ProjectQAPanel projectId={project.id} />
+            ) : null}
           </div>
           <ProjectOverviewPanel project={project} />
         </div>
