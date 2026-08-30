@@ -103,6 +103,12 @@ export function ProjectQAPanel({ projectId }: ProjectQAPanelProps) {
         </Button>
       </div>
 
+      {!isOpen && (
+        <p className="mt-2 text-xs text-muted">
+          试试问：「受访者提到了哪些关键时间节点？」
+        </p>
+      )}
+
       {isOpen ? (
         <>
           <p className="mt-3 text-sm text-muted">

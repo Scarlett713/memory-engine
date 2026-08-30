@@ -70,7 +70,10 @@ export function ProjectWorkflowBoard({
                         : "bg-white/80 text-muted"
                   }`}
                 >
-                  {statusMap[step.status]}
+                  {step.key === "manual_review" &&
+                  step.status === "in_progress"
+                    ? "待您审校"
+                    : statusMap[step.status]}
                 </span>
               </div>
 

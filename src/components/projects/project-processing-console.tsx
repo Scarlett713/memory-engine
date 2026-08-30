@@ -666,6 +666,20 @@ export function ProjectProcessingConsole({
           ) : null}
 
           {hasResults ? <ResultGrid project={currentProject} /> : null}
+
+          {currentProject.status === 'manual_review' && hasResults && (
+            <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-white via-white to-transparent">
+              <button
+                type="button"
+                onClick={handleConfirmReview}
+                disabled={isConfirming}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-success px-4 py-2.5 text-sm font-semibold text-white hover:bg-success/90 disabled:opacity-50"
+              >
+                {isConfirming ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
