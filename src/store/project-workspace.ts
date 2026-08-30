@@ -48,6 +48,7 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
       try {
         const response = await fetch("/api/projects", {
           cache: "no-store",
+          credentials: "include",
         });
         const payload = (await response.json()) as {
           message?: string;
@@ -92,6 +93,7 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
       try {
         const response = await fetch("/api/projects", {
           method: "POST",
+          credentials: "include",
           body: formData,
         });
         const result = (await response.json()) as {
@@ -125,6 +127,7 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
 
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       const payload = (await response.json()) as {
         message?: string;

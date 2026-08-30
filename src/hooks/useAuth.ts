@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { OUTLINE_SESSION_STORAGE_KEY } from '@/lib/outline-session';
 import type { UserProfile } from '@/types/user';
 
 interface AuthState {
@@ -31,6 +32,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem(OUTLINE_SESSION_STORAGE_KEY);
     setState({ user: null, loading: false });
     window.location.href = '/login';
   }, []);
