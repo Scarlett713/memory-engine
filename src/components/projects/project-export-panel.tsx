@@ -60,6 +60,13 @@ export function ProjectExportPanel({ project }: ProjectExportPanelProps) {
   );
 
   function handleExport(format: ExportFormat) {
+    if (
+      project.emotionalSignals?.some((s) => s.level === "high") &&
+      !window.confirm("检测到受访者在本段访谈中情绪较为激动，是否确认导出？")
+    ) {
+      return;
+    }
+
     if (!canExport) {
       return;
     }
