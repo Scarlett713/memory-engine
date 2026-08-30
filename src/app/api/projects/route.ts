@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { createProject, listProjects } from "@/lib/server/project-store";
+import {
+  createProject,
+  isProjectOwnedBy,
+  listProjects,
+} from "@/lib/server/project-store";
 import { saveInterviewAudio } from "@/lib/server/upload-store";
 import type {
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
+  UserType,
 } from "@/lib/types/project";
 
 function parseCustomRedactionRules(value: FormDataEntryValue | null) {
@@ -37,8 +42,16 @@ function parseCustomRedactionRules(value: FormDataEntryValue | null) {
   }
 }
 
-export async function GET() {
-  const projects = await listProjects();
+export async function GET(request: Request) {
+  const userId = request.headers.get("x-user-id");
+
+  if (!userId) {
+    return NextResponse.json({ message: "未登录。" }, { status: 401 });
+  }
+
+  const projects = (await listProjects()).filter((project) =>
+    isProjectOwnedBy(project, userId),
+  );
 
   return NextResponse.json({
     projects,
@@ -47,6 +60,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const userId = request.headers.get("x-user-id");
+    const userType: UserType =
+      request.headers.get("x-user-type") === "org" ? "institution" : "personal";
+
+    if (!userId) {
+      return NextResponse.json({ message: "未登录。" }, { status: 401 });
+    }
+
     const formData = await request.formData();
 
     const audio = formData.get("audio");
@@ -116,6 +137,8 @@ export async function POST(request: Request) {
       researchFocus,
       privacyLevel,
       customRedactionRules,
+      userId,
+      userType,
     });
 
     return NextResponse.json(

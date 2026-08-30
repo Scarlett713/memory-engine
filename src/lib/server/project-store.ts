@@ -10,6 +10,7 @@ import {
   type PrivacyLevel,
   type ProjectRecord,
   type RedactionRule,
+  type UserType,
 } from "@/lib/types/project";
 
 type CreateProjectInput = {
@@ -28,6 +29,8 @@ type CreateProjectInput = {
   researchFocus: string;
   privacyLevel: PrivacyLevel;
   customRedactionRules: RedactionRule[];
+  userId: string;
+  userType: UserType;
 };
 
 function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord {
@@ -49,6 +52,7 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
     audioSize: project.audioSize || 0,
     createdAt: project.createdAt || new Date().toISOString(),
     updatedAt: project.updatedAt || new Date().toISOString(),
+    userId: project.userId,
     status: project.status || "uploaded",
     workflow: Array.isArray(project.workflow)
       ? project.workflow
@@ -137,6 +141,17 @@ function sortProjects(projects: ProjectRecord[]) {
   );
 }
 
+/**
+ * 项目所有权判定：无 userId 的存量项目视为公共项目，
+ * 新项目仅归创建它的用户所有。
+ */
+export function isProjectOwnedBy(
+  project: Pick<ProjectRecord, "userId">,
+  userId: string | null | undefined,
+): boolean {
+  return !project.userId || project.userId === userId;
+}
+
 export async function listProjects() {
   const projects = await readProjects();
   return sortProjects(projects);
@@ -153,6 +168,7 @@ export async function createProject(
   const now = new Date().toISOString();
   const newProject: ProjectRecord = {
     id: nanoid(10),
+    userId: input.userId,
     projectName: input.projectName,
     institutionName: input.institutionName,
     intervieweeName: input.intervieweeName,
@@ -195,7 +211,7 @@ export async function createProject(
     sensitiveMarks: [],
     lastProcessingError: null,
     versionHistory: [],
-    userType: "institution",
+    userType: input.userType,
     consentFormPath: "",
   };
 

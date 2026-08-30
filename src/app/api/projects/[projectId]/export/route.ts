@@ -4,7 +4,11 @@ import {
   createProjectExport,
   type ProjectExportFormat,
 } from "@/lib/server/project-export";
-import { getProjectById, updateProject } from "@/lib/server/project-store";
+import {
+  getProjectById,
+  isProjectOwnedBy,
+  updateProject,
+} from "@/lib/server/project-store";
 import type { WorkflowStep, WorkflowStepKey, WorkflowStatus } from "@/lib/types/project";
 
 type RouteContext = {
@@ -33,10 +37,23 @@ function parseFormat(value: string | null): ProjectExportFormat {
 
 export async function GET(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
+  const userId = request.headers.get("x-user-id");
+
+  if (!userId) {
+    return NextResponse.json({ message: "未登录。" }, { status: 401 });
+  }
+
   const project = await getProjectById(projectId);
 
   if (!project) {
     return NextResponse.json({ message: "未找到项目。" }, { status: 404 });
+  }
+
+  if (!isProjectOwnedBy(project, userId)) {
+    return NextResponse.json(
+      { message: "无权访问该项目。" },
+      { status: 403 },
+    );
   }
 
   if (!project.aiDraft && !project.redactedAiDraft) {

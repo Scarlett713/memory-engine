@@ -118,6 +118,8 @@ export type ProjectRecord = {
   audioSize: number;
   createdAt: string;
   updatedAt: string;
+  // 项目归属用户；无 userId 的存量项目视为公共项目
+  userId?: string;
   status: ProjectStatus;
   workflow: WorkflowStep[];
   collectionScenario: InterviewScenario;

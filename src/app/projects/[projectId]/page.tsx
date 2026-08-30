@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -13,7 +14,10 @@ import { ProjectProcessingConsole } from "@/components/projects/project-processi
 import { ProjectWorkflowBoard } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getInterviewScenarioLabel } from "@/lib/oral-history";
-import { getProjectById } from "@/lib/server/project-store";
+import {
+  getProjectById,
+  isProjectOwnedBy,
+} from "@/lib/server/project-store";
 import { formatDateTime } from "@/lib/utils";
 
 type ProjectDetailPageProps = {
@@ -31,9 +35,10 @@ export default async function ProjectDetailPage({
 }: ProjectDetailPageProps) {
   const { projectId } = await params;
   const { autostart } = await searchParams;
+  const userId = (await headers()).get("x-user-id") ?? "";
   const project = await getProjectById(projectId);
 
-  if (!project) {
+  if (!project || !isProjectOwnedBy(project, userId)) {
     notFound();
   }
 
