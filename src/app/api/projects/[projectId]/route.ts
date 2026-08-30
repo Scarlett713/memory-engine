@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { VALID_TRANSITIONS } from "@/lib/types/project";
 import {
   deleteProject,
   getProjectById,
@@ -93,6 +94,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const body = await request.json() as Partial<import("@/lib/types/project").ProjectRecord>;
     const { userId: _ownerId, ...safeBody } = body;
+
+    // 状态机白名单：仅允许合法转换（同值幂等放行），非法返回 400
+    if (
+      safeBody.status &&
+      safeBody.status !== project.status &&
+      !VALID_TRANSITIONS[project.status]?.includes(safeBody.status)
+    ) {
+      return NextResponse.json({ message: "状态转换不合法。" }, { status: 400 });
+    }
+
     const updated = await updateProject(projectId, safeBody);
 
     if (!updated) {

@@ -35,6 +35,8 @@ export function RecentProjectList({
   const [isPending, startTransition] = useTransition();
 
   function handleDelete(projectId: string) {
+    if (!window.confirm("确定要删除该项目吗？此操作不可恢复。")) return;
+
     setError(null);
     setPendingProjectId(projectId);
 

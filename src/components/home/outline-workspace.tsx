@@ -267,6 +267,8 @@ export function OutlineWorkspace() {
   }
 
   function handleDeleteProject(projectId: string) {
+    if (!window.confirm("确定要删除该项目吗？此操作不可恢复。")) return;
+
     setPendingDeleteId(projectId);
 
     startDeleteTransition(async () => {

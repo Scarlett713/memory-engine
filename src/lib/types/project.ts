@@ -5,6 +5,16 @@
   | "manual_review"
   | "ready_to_export";
 
+// PATCH 状态机白名单：仅允许代码实际执行的顺序流转；ready_to_export 为终态。
+// 内部流转（process/export 路由）绕过 PATCH 直写 updateProject，不受此表约束。
+export const VALID_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
+  uploaded: ["transcribing"],
+  transcribing: ["ai_refining"],
+  ai_refining: ["manual_review"],
+  manual_review: ["ready_to_export"],
+  ready_to_export: [],
+};
+
 export type WorkflowStatus = "pending" | "in_progress" | "completed";
 
 export type WorkflowStepKey =
