@@ -9,9 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { ProjectOverviewPanel } from "@/components/projects/project-overview-panel";
-import { ProjectProcessingConsole } from "@/components/projects/project-processing-console";
-import { ProjectQAPanel } from "@/components/projects/project-qa-panel";
+import { ProjectDetailTabs } from "@/components/projects/project-detail-tabs";
 import { ProjectWorkflowBoard } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getInterviewScenarioLabel } from "@/lib/oral-history";
@@ -44,8 +42,8 @@ export default async function ProjectDetailPage({
   }
 
   return (
-    <main className="h-[100dvh] overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="grid h-full gap-2 grid-rows-[auto_minmax(0,1fr)]">
+    <main className="min-h-[100dvh] px-1 py-1 sm:px-1.5 sm:py-1.5">
+      <div className="grid gap-2">
         <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-4 md:p-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -119,19 +117,12 @@ export default async function ProjectDetailPage({
           </div>
         </section>
 
-        <div className="grid min-h-0 gap-2 xl:grid-cols-[1.28fr_0.9fr] xl:items-stretch">
-          <div className="grid min-h-0 gap-2 xl:grid-rows-[auto_minmax(0,1fr)_auto]">
-            <ProjectWorkflowBoard workflow={project.workflow} />
-            <ProjectProcessingConsole
-              project={project}
-              autoStart={autostart === "1"}
-            />
-            {project.status === "manual_review" ||
-            project.status === "ready_to_export" ? (
-              <ProjectQAPanel projectId={project.id} />
-            ) : null}
-          </div>
-          <ProjectOverviewPanel project={project} />
+        <div className="grid gap-2">
+          <ProjectWorkflowBoard workflow={project.workflow} />
+          <ProjectDetailTabs
+            project={project}
+            autoStart={autostart === "1"}
+          />
         </div>
       </div>
     </main>
