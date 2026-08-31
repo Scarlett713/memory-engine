@@ -486,10 +486,9 @@ export function OutlineWorkspace() {
                     rows={3}
                   />
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap gap-2 text-sm text-muted">
-                      <span className="meta-pill">聊天生成提纲</span>
-                      <span className="meta-pill">可继续编辑 Markdown</span>
-                    </div>
+                    <p className="text-sm text-muted">
+                      AI 生成提纲，可在右侧继续编辑
+                    </p>
                     <button
                       type="button"
                       className="send-pill"
