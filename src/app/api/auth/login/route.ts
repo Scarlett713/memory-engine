@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
     // ── 查找用户 ──────────────────────────────────────
     const user = await getUserByEmail(email);
     if (!user) {
-      // 故意不区分"用户不存在"和"密码错误"，防止枚举攻击
+      // Demo/校内场景：为提升 UX，这里区分“未注册”和“密码错误”（会增加邮箱枚举风险；线上建议配合限流/验证码后再区分）
       return NextResponse.json(
-        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误。如果您还没有账号，请先注册' },
+        { error: 'INVALID_CREDENTIALS', message: '该邮箱未注册，请先注册一个账号' },
         { status: 401 }
       );
     }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json(
-        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误。如果您还没有账号，请先注册' },
+        { error: 'INVALID_CREDENTIALS', message: '密码错误，请重试' },
         { status: 401 }
       );
     }
