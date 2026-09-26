@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!user) {
       // 故意不区分"用户不存在"和"密码错误"，防止枚举攻击
       return NextResponse.json(
-        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误' },
+        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误。如果您还没有账号，请先注册' },
         { status: 401 }
       );
     }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json(
-        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误' },
+        { error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误。如果您还没有账号，请先注册' },
         { status: 401 }
       );
     }
