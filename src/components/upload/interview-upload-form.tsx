@@ -202,7 +202,7 @@ export function InterviewUploadForm() {
         language,
       });
 
-      router.refresh();
+      // 注意：这里不要加 router.refresh()——与 push 同 tick 调用会吞掉跳转
       router.push(`/projects/${project.id}?autostart=1`);
     } catch (submitError) {
       setError(
