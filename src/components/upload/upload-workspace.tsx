@@ -24,8 +24,8 @@ export function UploadWorkspace() {
   }, [fetchProjects]);
 
   return (
-    <main className="h-[100dvh] overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="grid h-full gap-2 grid-rows-[auto_minmax(0,1fr)]">
+    <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5 xl:h-dvh xl:overflow-hidden">
+      <div className="flex flex-col gap-2 xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]">
         <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5 md:py-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="flex items-start gap-4">
@@ -37,7 +37,7 @@ export function UploadWorkspace() {
 
               <div>
                 <p className="section-eyebrow">记忆引擎</p>
-                <h1 className="font-display mt-2 text-[1.9rem] font-semibold leading-tight text-accent-strong md:text-[2.35rem]">
+                <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
                   音频建档与处理
                 </h1>
                 <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
@@ -62,7 +62,7 @@ export function UploadWorkspace() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
             {stepLabels.map(({ label, icon: Icon }, index) => (
               <div
                 key={label}
@@ -80,11 +80,11 @@ export function UploadWorkspace() {
           </div>
         </header>
 
-        <section className="grid min-h-0 gap-2 xl:grid-cols-[1.2fr_0.8fr] xl:items-stretch">
-          <div className="min-h-0">
+        <section className="grid gap-2 xl:min-h-0 xl:grid-cols-[1.2fr_0.8fr] xl:items-stretch">
+          <div className="min-w-0 xl:min-h-0">
             <InterviewUploadForm />
           </div>
-          <div className="min-h-0">
+          <div className="min-w-0 xl:min-h-0">
             <RecentProjectList projects={projects} isLoading={isLoading} />
           </div>
         </section>
