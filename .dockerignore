@@ -1,0 +1,35 @@
+# 依赖与构建缓存（容器内会重新安装/构建）
+node_modules
+.next
+out
+
+# 版本控制
+.git
+.gitignore
+
+# 密钥：严禁打进镜像（.env.example 例外，作为模板保留）
+.env*
+!.env.example
+
+# 运行期数据（容器启动会自动重建，无需打包）
+storage
+storage-backup-*
+tmp
+data
+
+# 大体积媒体（demo 用，用户可自己上传，不打进镜像）
+*.wav
+*.mp3
+*.mp4
+*.mov
+
+# 文档与日志
+docs
+README.md
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# 构建相关自身文件
+Dockerfile
+.dockerignore

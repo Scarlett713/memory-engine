@@ -1,19 +1,6 @@
 ﻿import type { Metadata } from "next";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 
 import "./globals.css";
-
-const sans = Noto_Sans_SC({
-  variable: "--font-body",
-  weight: ["400", "500", "700"],
-  preload: false,
-});
-
-const serif = Noto_Serif_SC({
-  variable: "--font-display",
-  weight: ["500", "700"],
-  preload: false,
-});
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "记忆引擎";
 
@@ -30,7 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={`${sans.variable} ${serif.variable}`}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
