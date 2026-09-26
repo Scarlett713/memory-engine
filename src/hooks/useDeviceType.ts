@@ -1,20 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 type DeviceType = 'desktop' | 'mobile';
 
+function subscribeToResize(onStoreChange: () => void) {
+  window.addEventListener('resize', onStoreChange);
+  return () => window.removeEventListener('resize', onStoreChange);
+}
+
+const getServerSnapshot = () => 'desktop' as const;
+
 export function useDeviceType(breakpoint: number = 768): DeviceType {
-  const [deviceType, setDeviceType] = useState<DeviceType>('desktop');
+  const getSnapshot = useCallback(
+    () => (window.innerWidth < breakpoint ? 'mobile' : 'desktop'),
+    [breakpoint],
+  );
 
-  useEffect(() => {
-    const checkDevice = () => {
-      setDeviceType(window.innerWidth < breakpoint ? 'mobile' : 'desktop');
-    };
-    checkDevice();
-    window.addEventListener('resize', checkDevice);
-    return () => window.removeEventListener('resize', checkDevice);
-  }, [breakpoint]);
-
-  return deviceType;
+  return useSyncExternalStore(subscribeToResize, getSnapshot, getServerSnapshot);
 }

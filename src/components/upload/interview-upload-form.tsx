@@ -106,7 +106,7 @@ function ConsentNotice({
 
 export function InterviewUploadForm() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const deviceType = useDeviceType();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
@@ -259,6 +259,17 @@ export function InterviewUploadForm() {
         submitError instanceof Error ? submitError.message : '上传失败，请稍后重试。'
       );
     }
+  }
+
+  // 认证状态未就绪 → 占位，避免首帧落到完整机构版表单
+  if (loading) {
+    return (
+      <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+        <div className="surface-card rounded-[1.4rem] p-5 text-sm text-muted">
+          正在加载表单...
+        </div>
+      </section>
+    );
   }
 
   // 移动端个人用户 → 极简版
