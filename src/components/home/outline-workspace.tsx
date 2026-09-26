@@ -286,10 +286,9 @@ export function OutlineWorkspace() {
     });
   }
 
-  return (
-    <main className="h-[100dvh] overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="outline-shell grid h-full gap-2 lg:grid-cols-[246px_minmax(0,1.5fr)_470px] xl:grid-cols-[256px_minmax(0,1.8fr)_540px]">
-        <aside className="paper-panel paper-panel-strong flex min-h-0 flex-col rounded-[1.85rem] p-4">
+  function renderLeftPanel() {
+    return (
+        <aside className="paper-panel paper-panel-strong flex xl:min-h-0 flex-col rounded-[1.85rem] p-4 order-2 xl:order-0">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="section-eyebrow">记忆引擎</p>
@@ -381,7 +380,7 @@ export function OutlineWorkspace() {
                 {isLoadingProjects ? "读取中" : `${projects.length} 个`}
               </span>
             </div>
-            <div className="soft-scroll mt-3 h-[calc(100%-1.8rem)] space-y-2 overflow-auto pr-1">
+            <div className="soft-scroll mt-3 max-h-[40dvh] xl:h-[calc(100%-1.8rem)] space-y-2 overflow-auto pr-1">
               {recentProjects.length > 0 ? (
                 recentProjects.map((project) => (
                   <div key={project.id} className="sidebar-project">
@@ -424,8 +423,12 @@ export function OutlineWorkspace() {
             </div>
           </section>
         </aside>
+    );
+  }
 
-        <section className="paper-panel relative flex min-h-0 flex-col overflow-hidden rounded-[1.85rem]">
+  function renderChatPanel() {
+    return (
+        <section className="paper-panel relative flex xl:min-h-0 flex-col xl:overflow-hidden rounded-[1.85rem] order-1 xl:order-0">
           <div className="outline-stage-header flex items-center justify-between gap-3 border-b border-line/60 px-4 py-3 md:px-5">
             <div className="flex items-center gap-3">
               <div className="archive-mark hidden min-h-[4.4rem] min-w-[4rem] sm:grid">
@@ -589,8 +592,12 @@ export function OutlineWorkspace() {
             )}
           </div>
         </section>
+    );
+  }
 
-        <aside className="paper-panel paper-panel-strong flex min-h-0 flex-col rounded-[1.85rem] p-4">
+  function renderEditorPanel() {
+    return (
+        <aside className="paper-panel paper-panel-strong flex xl:min-h-0 flex-col rounded-[1.85rem] p-4 order-3 xl:order-0">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="section-eyebrow">提纲编辑</p>
@@ -655,6 +662,15 @@ export function OutlineWorkspace() {
             </p>
           </div>
         </aside>
+    );
+  }
+
+  return (
+    <main className="min-h-[100dvh] xl:h-[100dvh] xl:overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
+      <div className="outline-shell grid xl:h-full gap-2 xl:grid-cols-[256px_minmax(0,1.8fr)_540px]">
+        {renderLeftPanel()}
+        {renderChatPanel()}
+        {renderEditorPanel()}
       </div>
     </main>
   );
