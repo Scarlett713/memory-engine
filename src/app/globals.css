@@ -68,7 +68,7 @@ body::before {
   inset: 0;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 78%);
   pointer-events: none;
-  position: fixed;
+  position: absolute;
   z-index: -2;
 }
 
@@ -80,7 +80,7 @@ body::after {
   inset: 0;
   opacity: 0.5;
   pointer-events: none;
-  position: fixed;
+  position: absolute;
   z-index: -1;
 }
 
@@ -173,6 +173,7 @@ a {
   gap: 0.55rem;
   min-height: 2.7rem;
   padding: 0 0.95rem;
+  white-space: nowrap;
 }
 
 .surface-card {
@@ -572,6 +573,34 @@ a {
 
   .chat-bubble {
     max-width: 100%;
+  }
+}
+
+/* 手机端（<768px，与 Tailwind md 断点、useDeviceType 默认断点一致） */
+@media (max-width: 767px) {
+  /* 中文标签在宽字距下浪费大量横向空间 */
+  .section-eyebrow {
+    letter-spacing: 0.12em;
+  }
+
+  .field-label {
+    letter-spacing: 0.08em;
+  }
+
+  /* 桌面尺寸的滚动条在触屏上既看不见也拖不动 */
+  .soft-scroll::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  /* 固定 min-width 会在窄屏把按钮撑出容器 */
+  .send-pill {
+    min-width: 0;
+  }
+
+  /* 铺满整屏的 blur(24px) 在移动 GPU 上明显掉帧 */
+  .paper-panel {
+    backdrop-filter: blur(12px);
   }
 }
 

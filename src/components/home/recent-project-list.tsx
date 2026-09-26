@@ -56,7 +56,7 @@ export function RecentProjectList({
   }
 
   return (
-    <section className="paper-panel h-full min-h-0 rounded-[2rem] p-5 md:p-6">
+    <section className="paper-panel rounded-[2rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="section-eyebrow">项目索引</p>
@@ -77,7 +77,7 @@ export function RecentProjectList({
         </div>
       ) : null}
 
-      <div className="soft-scroll mt-4 h-[calc(100%-4.6rem)] overflow-auto pr-1">
+      <div className="soft-scroll mt-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto">
         <div className="space-y-3">
           {isLoading ? (
             <div className="surface-card rounded-[1.4rem] p-5 text-sm text-muted">
@@ -118,10 +118,10 @@ export function RecentProjectList({
                       </h3>
                       <StatusBadge status={project.status} />
                     </div>
-                    <p className="mt-2 text-sm text-muted">
+                    <p className="mt-2 truncate text-sm text-muted">
                       受访对象：{project.intervieweeName || "未填写"}
                     </p>
-                    <p className="mt-1 text-sm text-muted">
+                    <p className="mt-1 truncate text-sm text-muted">
                       受访音频：{project.audioFileName}
                     </p>
                   </div>
