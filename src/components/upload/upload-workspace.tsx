@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { AudioWaveform, FileText, FolderArchive, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, AudioWaveform, FileText, FolderArchive, Sparkles } from "lucide-react";
 
 import { RecentProjectList } from "@/components/home/recent-project-list";
 import { InterviewUploadForm } from "@/components/upload/interview-upload-form";
@@ -36,7 +37,14 @@ export function UploadWorkspace() {
               </div>
 
               <div>
-                <p className="section-eyebrow">记忆引擎</p>
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  返回工作台
+                </Link>
+                <p className="section-eyebrow mt-3">记忆引擎</p>
                 <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
                   音频建档与处理
                 </h1>

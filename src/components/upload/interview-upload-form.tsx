@@ -1,10 +1,8 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   AudioLines,
   FileText,
   LoaderCircle,
@@ -266,7 +264,7 @@ export function InterviewUploadForm() {
   // 移动端个人用户 → 极简版
   if (deviceType === 'mobile' && user?.userType === 'personal') {
     return (
-      <section className="archive-frame paper-panel paper-panel-strong h-full min-h-0 rounded-[1.85rem] p-5">
+      <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5">
         <div className="mb-5">
           <p className="section-eyebrow">上传音频</p>
           <h2 className="font-display mt-2 text-2xl font-semibold text-accent-strong">
@@ -274,7 +272,7 @@ export function InterviewUploadForm() {
           </h2>
         </div>
 
-        <form className="soft-scroll space-y-4 overflow-auto" onSubmit={handleSimpleSubmit}>
+        <form className="soft-scroll space-y-4" onSubmit={handleSimpleSubmit}>
           <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
 
           {error && (
@@ -382,7 +380,7 @@ export function InterviewUploadForm() {
   }
 
   return (
-    <section className="archive-frame paper-panel paper-panel-strong h-full min-h-0 rounded-[1.85rem] p-5 md:p-6">
+    <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="section-eyebrow">Step 02</p>
@@ -402,15 +400,11 @@ export function InterviewUploadForm() {
             <ShieldCheck className="h-4 w-4 text-accent-strong" />
             脱敏规则可配置
           </div>
-          <Link href="/" className="meta-pill">
-            <ArrowLeft className="h-4 w-4 text-accent-strong" />
-            返回提纲页
-          </Link>
         </div>
       </div>
 
       <form
-        className="soft-scroll mt-5 h-[calc(100%-5.4rem)] space-y-4 overflow-auto pr-1"
+        className="soft-scroll mt-5 space-y-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto"
         onSubmit={handleSubmit}
       >
         <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
@@ -677,7 +671,7 @@ export function InterviewUploadForm() {
           </p>
           <Button
             type="submit"
-            className="min-w-[220px] justify-center"
+            className="w-full justify-center sm:w-auto sm:min-w-[220px]"
             disabled={isSubmitting || !consentChecked}
           >
             {isSubmitting ? (
