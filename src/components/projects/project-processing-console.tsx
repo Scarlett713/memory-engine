@@ -549,7 +549,7 @@ export function ProjectProcessingConsole({
               <Button
                 type="button"
                 variant="secondary"
-                className="min-w-[138px]"
+                className="hidden min-w-[138px] xl:inline-flex"
                 onClick={() => setIsExpanded(true)}
               >
                 <Maximize2 className="h-4 w-4" />
@@ -666,7 +666,35 @@ export function ProjectProcessingConsole({
             </div>
           ) : null}
 
-          {hasResults ? <ResultGrid project={currentProject} /> : null}
+          {hasResults ? (
+            <>
+              <div className="xl:hidden surface-card rounded-[1.5rem] p-5">
+                <div className="flex items-start gap-3">
+                  <FileText className="mt-0.5 h-5 w-5 shrink-0 text-accent-strong" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      整理结果已生成
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-muted">
+                      包含：自动转写 · 脱敏稿 · 分段转写 · 摘要 · 情绪识别 · 关键词 · 时间线 · 结构化档案
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(true)}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1rem] border border-line/60 bg-white/70 px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-white"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  查看整理结果
+                </button>
+              </div>
+
+              <div className="hidden xl:block">
+                <ResultGrid project={currentProject} />
+              </div>
+            </>
+          ) : null}
 
           {currentProject.status === 'manual_review' && hasResults && (
             <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-white via-white to-transparent">
