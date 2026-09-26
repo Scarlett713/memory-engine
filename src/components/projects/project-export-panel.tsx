@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Download, FileCode2, FileText, LoaderCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import type { ProjectRecord } from "@/lib/types/project";
@@ -49,7 +48,6 @@ function readFileNameFromHeader(header: string | null, fallback: string) {
 }
 
 export function ProjectExportPanel({ project }: ProjectExportPanelProps) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [activeFormat, setActiveFormat] = useState<ExportFormat | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -100,7 +98,8 @@ export function ProjectExportPanel({ project }: ProjectExportPanelProps) {
         anchor.remove();
         URL.revokeObjectURL(url);
 
-        router.refresh();
+        // 注意：此处不要 router.refresh()——会重渲染整棵 RSC 树，页面会闪一下，
+        // 并且 status 变成 ready_to_export 后本面板会被卸载掉，没法连续导出其它格式
       } catch (exportError) {
         setError(
           exportError instanceof Error

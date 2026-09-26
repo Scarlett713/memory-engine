@@ -415,7 +415,8 @@ export function ProjectProcessingConsole({
       a.href = url; a.download = fileName;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-      router.refresh();
+
+      // 注意：此处不要 router.refresh()——会重渲染整棵 RSC 树，页面会闪一下
     } catch (e) {
       setExportError(e instanceof Error ? e.message : '导出失败，请重试');
     } finally {
