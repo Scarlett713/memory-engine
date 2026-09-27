@@ -6,7 +6,7 @@
   ShieldCheck,
 } from "lucide-react";
 
-import type { WorkflowStep } from "@/lib/types/project";
+import type { WorkflowStatus, WorkflowStep } from "@/lib/types/project";
 
 type ProjectWorkflowBoardProps = {
   workflow: WorkflowStep[];
@@ -20,7 +20,7 @@ const iconMap = {
   export: FileOutput,
 };
 
-const statusMap = {
+const statusMap: Record<WorkflowStatus, string> = {
   completed: "已完成",
   in_progress: "进行中",
   pending: "待处理",
@@ -32,9 +32,9 @@ export function ProjectWorkflowBoard({
   return (
     <section className="paper-panel rounded-[1.85rem] p-4 md:p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="section-eyebrow">自动处理链路</p>
+        <p className="section-eyebrow">处理进度</p>
         <p className="text-xs leading-5 text-muted">
-          上传后自动完成转写、AI整理与审校准备
+          上传后自动完成音视频转写、整理与脱敏，人工审校后即可导出。
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export function ProjectWorkflowBoard({
                   {step.key === "manual_review" &&
                   step.status === "in_progress"
                     ? "待您审校"
-                    : statusMap[step.status]}
+                    : (statusMap[step.status] ?? statusMap.pending)}
                 </span>
               </div>
 

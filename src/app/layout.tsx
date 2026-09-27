@@ -7,7 +7,7 @@ const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "记忆引擎";
 export const metadata: Metadata = {
   title: `${appName} | 口述历史采集与整理工作台`,
   description:
-    "面向口述历史场景的提纲生成、音频转写、AI整理、人工审校与档案导出工作台。",
+    "面向口述史业务的数智化处理平台，覆盖音视频转写、整理与脱敏、人工校定与档案导出全链条。",
 };
 
 export default function RootLayout({
