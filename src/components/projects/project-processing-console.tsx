@@ -516,7 +516,7 @@ export function ProjectProcessingConsole({
               {isBusy ? (
                 <>
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  正在整理...
+                  整理中…
                 </>
               ) : (
                 <>
