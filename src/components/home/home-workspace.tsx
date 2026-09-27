@@ -28,7 +28,7 @@ const workflowLabels = [
     icon: AudioWaveform,
   },
   {
-    label: "情绪识别",
+    label: "情绪提示",
     icon: HeartHandshake,
   },
   {

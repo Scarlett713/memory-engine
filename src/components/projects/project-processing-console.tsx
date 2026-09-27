@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { EmotionSignal, ProjectRecord, TranscriptSegment } from "@/lib/types/project";
+import type { EmotionSignal, ProjectRecord } from "@/lib/types/project";
 
 type ProjectProcessingConsoleProps = {
   project: ProjectRecord;
@@ -32,13 +32,6 @@ type TextPanelProps = {
   tag: string;
   dense?: boolean;
 };
-
-function formatSegmentTime(value: number) {
-  const totalSeconds = Math.max(0, Math.floor(value / 1000));
-  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
 
 function SurfaceSection({
   title,
@@ -77,42 +70,6 @@ function TextPanel({ title, icon: Icon, content, tag, dense = false }: TextPanel
   );
 }
 
-function SegmentList({
-  segments,
-  dense = false,
-}: {
-  segments: TranscriptSegment[];
-  dense?: boolean;
-}) {
-  return (
-    <SurfaceSection title="分段转写" icon={ScanText} tag="Trace" dense={dense}>
-      <div className="grid gap-3">
-        {segments.length > 0 ? (
-          segments.map((segment) => (
-            <div
-              key={segment.id}
-              className="rounded-[1.1rem] border border-line/70 bg-white/58 p-4"
-            >
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-[0.08em] text-accent-strong">
-                <span className="rounded-full bg-accent-soft/60 px-2.5 py-1 text-[11px]">
-                  {formatSegmentTime(segment.startMs)}
-                </span>
-                <span>{segment.speaker}</span>
-                {typeof segment.confidence === "number" ? (
-                  <span>置信度 {Math.round(segment.confidence * 100)}%</span>
-                ) : null}
-              </div>
-              <p className="mt-3 text-sm leading-7 text-foreground">{segment.text}</p>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm leading-6 text-muted">暂无分段转写结果。</p>
-        )}
-      </div>
-    </SurfaceSection>
-  );
-}
-
 function EmotionPanel({
   signals,
   dense = false,
@@ -128,7 +85,7 @@ function EmotionPanel({
 
   return (
     <SurfaceSection
-      title="情感与创伤识别"
+      title="情绪提示"
       icon={AlertTriangle}
       tag="Safety"
       dense={dense}
@@ -234,7 +191,7 @@ function TimelinePanel({
   dense?: boolean;
 }) {
   return (
-    <SurfaceSection title="关键时间线" icon={Sparkles} tag="Timeline" dense={dense}>
+    <SurfaceSection title="要素标引" icon={Sparkles} tag="Timeline" dense={dense}>
       <div className="grid gap-3">
         {events.length > 0 ? (
           events.map((event) => (
@@ -306,7 +263,6 @@ function ResultGrid({ project, expanded = false }: { project: ProjectRecord; exp
             tag="Redacted"
             dense={expanded}
           />
-          <SegmentList segments={project.transcriptSegments} dense={expanded} />
         </div>
 
         <div className="grid gap-4">
@@ -581,7 +537,7 @@ export function ProjectProcessingConsole({
 
           {!hasResults ? (
             <div className="surface-card rounded-[1.5rem] p-5 text-sm leading-6 text-muted">
-              上传完成后，系统会自动生成分段转写、情绪提示、脱敏稿和结构化档案内容；如果没有自动触发，也可以手动点击右上角立即开始整理。
+              上传完成后，系统会自动生成音视频转写、情绪提示、脱敏稿和结构化档案内容；如果没有自动触发，也可以手动点击右上角立即开始整理。
             </div>
           ) : null}
 
@@ -676,7 +632,7 @@ export function ProjectProcessingConsole({
                       整理结果已生成
                     </p>
                     <p className="mt-1 text-sm leading-6 text-muted">
-                      包含：自动转写 · 脱敏稿 · 分段转写 · 摘要 · 情绪识别 · 关键词 · 时间线 · 结构化档案
+                      包含：音视频转写 · 脱敏稿 · 摘要 · 情绪提示 · 主题关键词 · 脱敏提示 · 要素标引 · 结构化档案
                     </p>
                   </div>
                 </div>
