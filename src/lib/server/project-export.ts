@@ -29,13 +29,6 @@ function sanitizeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|]/g, "_").trim() || "oral-history-project";
 }
 
-function formatSegmentTime(value: number) {
-  const totalSeconds = Math.max(0, Math.floor(value / 1000));
-  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
 function splitParagraphLines(value: string) {
   const lines = value
     .split(/\r?\n/)
@@ -285,7 +278,6 @@ function buildArchivePayload(project: ProjectRecord) {
 
 async function buildDocx(project: ProjectRecord) {
   const payload = buildArchivePayload(project);
-  const redactedSegments = buildRedactedSegmentText(project);
 
   const sections: ISectionOptions[] = [
     {
@@ -342,7 +334,7 @@ async function buildDocx(project: ProjectRecord) {
             : ["暂无结构化内容。"],
         ),
         ...createParagraphs(
-          "关键时间线",
+          "要素标引",
           payload.timelineEvents.length > 0
             ? payload.timelineEvents.map(
                 (event) =>
@@ -351,7 +343,7 @@ async function buildDocx(project: ProjectRecord) {
             : ["暂无时间线内容。"],
         ),
         ...createParagraphs(
-          "情感与创伤识别",
+          "情绪提示",
           payload.emotionalSignals.length > 0
             ? payload.emotionalSignals.map(
                 (signal) =>
@@ -366,15 +358,6 @@ async function buildDocx(project: ProjectRecord) {
             : ["当前项目未生成额外脱敏提示。"],
         ),
         ...createParagraphs("脱敏整理稿", [payload.redactedAiDraft || "暂无整理稿。"]),
-        ...createParagraphs(
-          "分段转写稿",
-          redactedSegments.length > 0
-            ? redactedSegments.map(
-                (segment) =>
-                  `[${formatSegmentTime(segment.startMs)} - ${formatSegmentTime(segment.endMs)}] ${segment.speaker}：${segment.text}`,
-              )
-            : [payload.redactedTranscript || "暂无转写稿。"],
-        ),
       ],
     },
   ];
@@ -464,7 +447,7 @@ function buildTxt(project: ProjectRecord) {
           "",
         ])
       : ["暂无结构化内容。", ""]),
-    "【关键时间线】",
+    "【要素标引】",
     ...(payload.timelineEvents.length > 0
       ? payload.timelineEvents.flatMap((event) => [
           `${event.timeLabel} - ${event.title}`,
@@ -472,7 +455,7 @@ function buildTxt(project: ProjectRecord) {
           "",
         ])
       : ["暂无时间线内容。", ""]),
-    "【情感与创伤识别】",
+    "【情绪提示】",
     ...(payload.emotionalSignals.length > 0
       ? payload.emotionalSignals.flatMap((signal) => [
           `${signal.label}（${signal.level}）`,
@@ -488,12 +471,6 @@ function buildTxt(project: ProjectRecord) {
     "",
     "【脱敏整理稿】",
     payload.redactedAiDraft || "暂无整理稿。",
-    "",
-    "【分段转写稿】",
-    ...buildRedactedSegmentText(project).map(
-      (segment) =>
-        `[${formatSegmentTime(segment.startMs)} - ${formatSegmentTime(segment.endMs)}] ${segment.speaker}：${segment.text}`,
-    ),
   ].join("\n");
 }
 

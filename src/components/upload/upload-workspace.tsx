@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, AudioWaveform, FileText, FolderArchive, Sparkles } from "lucide-react";
 
-import { RecentProjectList } from "@/components/home/recent-project-list";
 import { InterviewUploadForm } from "@/components/upload/interview-upload-form";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
 
@@ -17,7 +16,6 @@ const stepLabels = [
 
 export function UploadWorkspace() {
   const projects = useProjectWorkspaceStore((state) => state.projects);
-  const isLoading = useProjectWorkspaceStore((state) => state.isLoading);
   const fetchProjects = useProjectWorkspaceStore((state) => state.fetchProjects);
 
   useEffect(() => {
@@ -49,7 +47,7 @@ export function UploadWorkspace() {
                   音频建档与处理
                 </h1>
                 <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-                  先完成聊天式提纲构建，再把本地受访音频与项目信息一起建档，进入自动转写与整理流程。
+                  填写受访人基础信息，上传本地音视频文件，进入自动转写与整理流程。
                 </p>
               </div>
             </div>
@@ -88,13 +86,8 @@ export function UploadWorkspace() {
           </div>
         </header>
 
-        <section className="grid gap-2 xl:min-h-0 xl:grid-cols-[1.2fr_0.8fr] xl:items-stretch">
-          <div className="min-w-0 xl:min-h-0">
-            <InterviewUploadForm />
-          </div>
-          <div className="min-w-0 xl:min-h-0">
-            <RecentProjectList projects={projects} isLoading={isLoading} />
-          </div>
+        <section className="min-w-0 xl:min-h-0">
+          <InterviewUploadForm />
         </section>
       </div>
     </main>

@@ -10,7 +10,9 @@ import {
   FileText,
   FolderArchive,
   LoaderCircle,
+  MessageSquare,
   MessageSquareDashed,
+  MoreHorizontal,
   NotebookPen,
   Plus,
   Send,
@@ -37,6 +39,7 @@ import { buildPrintableMarkdownDocument } from "@/lib/markdown-print";
 import { formatDateTime } from "@/lib/utils";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
 import { useAuth } from "@/hooks/useAuth";
+import { useDeviceType } from "@/hooks/useDeviceType";
 
 const quickPrompts = [
   "我要做一场关于老城厢生活变迁的口述访谈，请帮我先搭一个提纲。",
@@ -81,6 +84,14 @@ export function OutlineWorkspace() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "notes" | "more">("chat");
+  const isDesktop = useDeviceType(1280) === "desktop";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     void fetchProjects();
@@ -286,46 +297,49 @@ export function OutlineWorkspace() {
     });
   }
 
-  return (
-    <main className="h-[100dvh] overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="outline-shell grid h-full gap-2 lg:grid-cols-[246px_minmax(0,1.5fr)_470px] xl:grid-cols-[256px_minmax(0,1.8fr)_540px]">
-        <aside className="paper-panel paper-panel-strong flex min-h-0 flex-col rounded-[1.85rem] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="section-eyebrow">记忆引擎</p>
-              <h1 className="font-display mt-1 text-2xl font-semibold text-accent-strong">
-                提纲工作台
-              </h1>
-            </div>
-            <button
-              type="button"
-              className="mini-icon-button"
-              onClick={handleReset}
-              aria-label="新建提纲"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* 用户信息 */}
-          {user && (
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-stone-700" title={user.email}>
-                  {user.email}
-                </p>
-                <p className="text-[10px] text-stone-400">
-                  {user.userType === 'personal' ? '个人版' : '机构版'}
-                </p>
+  function renderLeftPanel() {
+    return (
+        <aside className="paper-panel paper-panel-strong flex xl:min-h-0 flex-col rounded-[1.85rem] p-4 order-2 xl:order-0">
+          {isDesktop && (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="section-eyebrow">记忆引擎</p>
+                  <h1 className="font-display mt-1 text-2xl font-semibold text-accent-strong">
+                    提纲工作台
+                  </h1>
+                </div>
+                <button
+                  type="button"
+                  className="mini-icon-button"
+                  onClick={handleReset}
+                  aria-label="新建提纲"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={logout}
-                className="ml-2 shrink-0 text-[11px] text-stone-400 hover:text-red-500 transition-colors"
-              >
-                退出
-              </button>
-            </div>
+
+              {/* 用户信息 */}
+              {user && (
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-stone-700" title={user.email}>
+                      {user.email}
+                    </p>
+                    <p className="text-[10px] text-stone-400">
+                      {user.userType === 'personal' ? '个人版' : '机构版'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="ml-2 shrink-0 text-[11px] text-stone-400 hover:text-red-500 transition-colors"
+                  >
+                    退出
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           <div className="mt-4 grid gap-2">
@@ -381,7 +395,7 @@ export function OutlineWorkspace() {
                 {isLoadingProjects ? "读取中" : `${projects.length} 个`}
               </span>
             </div>
-            <div className="soft-scroll mt-3 h-[calc(100%-1.8rem)] space-y-2 overflow-auto pr-1">
+            <div className="soft-scroll mt-3 max-h-[40dvh] xl:h-[calc(100%-1.8rem)] space-y-2 overflow-auto pr-1">
               {recentProjects.length > 0 ? (
                 recentProjects.map((project) => (
                   <div key={project.id} className="sidebar-project">
@@ -424,8 +438,12 @@ export function OutlineWorkspace() {
             </div>
           </section>
         </aside>
+    );
+  }
 
-        <section className="paper-panel relative flex min-h-0 flex-col overflow-hidden rounded-[1.85rem]">
+  function renderChatPanel() {
+    return (
+        <section className="paper-panel relative flex xl:min-h-0 flex-col xl:overflow-hidden rounded-[1.85rem] order-1 xl:order-0">
           <div className="outline-stage-header flex items-center justify-between gap-3 border-b border-line/60 px-4 py-3 md:px-5">
             <div className="flex items-center gap-3">
               <div className="archive-mark hidden min-h-[4.4rem] min-w-[4rem] sm:grid">
@@ -589,8 +607,12 @@ export function OutlineWorkspace() {
             )}
           </div>
         </section>
+    );
+  }
 
-        <aside className="paper-panel paper-panel-strong flex min-h-0 flex-col rounded-[1.85rem] p-4">
+  function renderEditorPanel() {
+    return (
+        <aside className="paper-panel paper-panel-strong flex xl:min-h-0 flex-col rounded-[1.85rem] p-4 order-3 xl:order-0">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="section-eyebrow">提纲编辑</p>
@@ -655,7 +677,89 @@ export function OutlineWorkspace() {
             </p>
           </div>
         </aside>
+    );
+  }
+
+  if (!mounted) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center">
+        <span className="text-sm text-muted">加载中…</span>
+      </main>
+    );
+  }
+
+  return isDesktop ? (
+    <main className="min-h-[100dvh] xl:h-[100dvh] xl:overflow-hidden px-1 py-1 sm:px-1.5 sm:py-1.5">
+      <div className="outline-shell grid xl:h-full gap-2 xl:grid-cols-[256px_minmax(0,1.8fr)_540px]">
+        {renderLeftPanel()}
+        {renderChatPanel()}
+        {renderEditorPanel()}
       </div>
+    </main>
+  ) : (
+    <main className="flex h-[100dvh] flex-col">
+      {/* 顶栏 */}
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line/60 px-4 py-3">
+        <div className="shrink-0">
+          <p className="section-eyebrow">记忆引擎</p>
+          <h1 className="font-display text-lg font-semibold text-accent-strong">
+            提纲工作台
+          </h1>
+        </div>
+        {user && (
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 text-right">
+              <p className="truncate text-xs font-medium text-stone-700" title={user.email}>
+                {user.email}
+              </p>
+              <p className="text-[10px] text-stone-400">
+                {user.userType === "personal" ? "个人版" : "机构版"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="shrink-0 text-xs text-stone-400 hover:text-red-500 transition-colors"
+            >
+              退出
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/* 内容区 */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {activeTab === "chat" && renderChatPanel()}
+        {activeTab === "notes" && renderEditorPanel()}
+        {activeTab === "more" && renderLeftPanel()}
+      </div>
+
+      {/* 底部 Tab 栏 */}
+      <nav className="shrink-0 border-t border-line/60 bg-white/80 backdrop-blur">
+        <div className="grid grid-cols-3">
+          {(
+            [
+              { key: "chat", label: "对话", Icon: MessageSquare },
+              { key: "notes", label: "笔记", Icon: FileText },
+              { key: "more", label: "更多", Icon: MoreHorizontal },
+            ] as const
+          ).map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveTab(key)}
+              className={`flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+                activeTab === key
+                  ? "text-accent-strong"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }

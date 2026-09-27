@@ -175,13 +175,13 @@ export function createInitialWorkflow(): WorkflowStep[] {
     {
       key: "transcription",
       label: "高精度语音转写",
-      description: "调用语音识别服务，输出可回溯的分段转写结果。",
+      description: "调用语音识别服务，输出音视频转写稿。",
       status: "pending",
     },
     {
       key: "ai_refine",
       label: "结构化整理与脱敏",
-      description: "完成摘要、结构化整理、情绪识别与隐私脱敏。",
+      description: "完成摘要、结构化整理、情绪提示与隐私脱敏。",
       status: "pending",
     },
     {

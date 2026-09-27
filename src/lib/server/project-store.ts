@@ -34,6 +34,25 @@ type CreateProjectInput = {
   language?: string;
 };
 
+function normalizeWorkflowCopy(
+  stored: ProjectRecord["workflow"] | undefined,
+): ProjectRecord["workflow"] {
+  if (!Array.isArray(stored) || stored.length === 0) {
+    return createInitialWorkflow();
+  }
+
+  const presets = new Map(
+    createInitialWorkflow().map((step) => [step.key, step]),
+  );
+
+  return stored.map((step) => {
+    const preset = presets.get(step.key);
+    return preset
+      ? { ...step, label: preset.label, description: preset.description }
+      : step;
+  });
+}
+
 function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord {
   const collectionScenario = project.collectionScenario || "urban_memory";
   const researchFocus = project.researchFocus || "";
@@ -55,9 +74,7 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
     updatedAt: project.updatedAt || new Date().toISOString(),
     userId: project.userId,
     status: project.status || "uploaded",
-    workflow: Array.isArray(project.workflow)
-      ? project.workflow
-      : createInitialWorkflow(),
+    workflow: normalizeWorkflowCopy(project.workflow),
     collectionScenario,
     researchFocus,
     language: project.language || "",

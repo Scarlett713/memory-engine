@@ -38,7 +38,7 @@ export function ProjectWorkflowBoard({
         </p>
       </div>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-3 flex gap-2 overflow-x-auto xl:grid xl:overflow-visible xl:grid-cols-5">
         {workflow.map((step, index) => {
           const Icon = iconMap[step.key];
           const isCompleted = step.status === "completed";
@@ -47,7 +47,7 @@ export function ProjectWorkflowBoard({
           return (
             <article
               key={step.key}
-              className="surface-card relative rounded-[1.45rem] p-4"
+              className="surface-card relative rounded-[1.45rem] p-4 min-w-[200px] shrink-0 xl:min-w-0 xl:shrink"
             >
               <div className="flex items-start justify-between gap-2">
                 <div

@@ -91,26 +91,26 @@ export default async function ProjectDetailPage({
               </div>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
-              <div className="surface-card rounded-[1.2rem] px-4 py-3">
+            <div className="grid gap-1.5 sm:grid-cols-3 sm:gap-2">
+              <div className="surface-card min-w-0 rounded-xl px-3 py-2 sm:rounded-[1.2rem] sm:px-4 sm:py-3 flex items-center justify-between sm:block">
                 <span className="section-eyebrow">受访对象</span>
-                <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <UserRound className="h-4 w-4 text-accent-strong" />
-                  {project.intervieweeName || "未填写"}
+                <p className="sm:mt-2 flex min-w-0 items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                  <UserRound className="hidden sm:block h-4 w-4 text-accent-strong" />
+                  <span className="truncate">{project.intervieweeName || "未填写"}</span>
                 </p>
               </div>
-              <div className="surface-card rounded-[1.2rem] px-4 py-3">
+              <div className="surface-card min-w-0 rounded-xl px-3 py-2 sm:rounded-[1.2rem] sm:px-4 sm:py-3 flex items-center justify-between sm:block">
                 <span className="section-eyebrow">受访音频</span>
-                <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <AudioLines className="h-4 w-4 text-accent-strong" />
-                  {project.audioFileName}
+                <p className="sm:mt-2 flex min-w-0 items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                  <AudioLines className="hidden sm:block h-4 w-4 text-accent-strong" />
+                  <span className="truncate">{project.audioFileName}</span>
                 </p>
               </div>
-              <div className="surface-card rounded-[1.2rem] px-4 py-3">
+              <div className="surface-card min-w-0 rounded-xl px-3 py-2 sm:rounded-[1.2rem] sm:px-4 sm:py-3 flex items-center justify-between sm:block">
                 <span className="section-eyebrow">建档时间</span>
-                <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <CalendarClock className="h-4 w-4 text-accent-strong" />
-                  {formatDateTime(project.createdAt)}
+                <p className="sm:mt-2 flex min-w-0 items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                  <CalendarClock className="hidden sm:block h-4 w-4 text-accent-strong" />
+                  <span className="truncate">{formatDateTime(project.createdAt)}</span>
                 </p>
               </div>
             </div>

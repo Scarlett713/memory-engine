@@ -16,8 +16,11 @@
   --success: #325f48;
   --warning: #91683d;
   --danger: #8e3f34;
-  --app-font-sans: var(--font-body), "Noto Sans SC", sans-serif;
-  --app-font-display: var(--font-display), "Noto Serif SC", serif;
+  /* 系统自带中文字体栈：去掉 next/font/google 的构建期外网依赖，国内部署机构建机也能稳定通过 */
+  --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Hiragino Sans GB", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --font-display: "Songti SC", "SimSun", "Noto Serif SC", "Source Han Serif SC", "STSong", serif;
+  --app-font-sans: var(--font-body);
+  --app-font-display: var(--font-display);
 }
 
 @theme inline {
@@ -566,7 +569,7 @@ a {
   color: var(--foreground);
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .outline-shell::before {
     display: none;
   }
@@ -577,7 +580,7 @@ a {
 }
 
 /* 手机端（<768px，与 Tailwind md 断点、useDeviceType 默认断点一致） */
-@media (max-width: 767px) {
+@media (max-width: 1279px) {
   /* 中文标签在宽字距下浪费大量横向空间 */
   .section-eyebrow {
     letter-spacing: 0.12em;
