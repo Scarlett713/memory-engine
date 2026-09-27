@@ -92,7 +92,7 @@ export function RecentProjectList({
                 <p className="text-sm font-semibold">暂无项目</p>
               </div>
               <p className="mt-3 text-sm leading-6 text-muted">
-                左侧完成访谈提纲与上传建档后，这里会显示项目进度与进入入口。
+                上传受访音视频并完成建档后，这里会显示项目进度与进入入口。
               </p>
             </div>
           ) : null}

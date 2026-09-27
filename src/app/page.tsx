@@ -1,5 +1,5 @@
-import { OutlineWorkspace } from "@/components/home/outline-workspace";
+import { HomeDashboard } from "@/components/home/home-dashboard";
 
 export default function Home() {
-  return <OutlineWorkspace />;
+  return <HomeDashboard />;
 }
