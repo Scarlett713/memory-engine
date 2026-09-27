@@ -224,7 +224,7 @@ function createMarkdownParagraphs(title: string, markdown: string) {
       new Paragraph({
         alignment: AlignmentType.LEFT,
         spacing: { after: 120 },
-        children: [new TextRun("未保存前置提纲草稿。")],
+        children: [new TextRun("未保存提纲草稿。")],
       }),
     );
   }
@@ -434,7 +434,7 @@ function buildTxt(project: ProjectRecord) {
     ...payload.collectionPlan.safetyTips.map((item) => `安全建议：${item}`),
     "",
     "【访谈提纲草稿】",
-    payload.outlineDraftMarkdown || "未保存前置提纲草稿。",
+    payload.outlineDraftMarkdown || "未保存提纲草稿。",
     "",
     "【口述摘要】",
     payload.summary || "暂无摘要。",
