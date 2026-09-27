@@ -656,7 +656,7 @@ export function InterviewUploadForm() {
 
         <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-sm leading-6 text-muted">
-            提交后将直接开始本地音频转写、AI 整理与隐私脱敏处理，上一阶段生成的访谈提纲也会一并写入项目档案。
+            提交后将直接开始本地音频转写、AI 整理与隐私脱敏处理。
           </p>
           <Button
             type="submit"
@@ -666,7 +666,7 @@ export function InterviewUploadForm() {
             {isSubmitting ? (
               <>
                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                正在上传并处理...
+                上传中…
               </>
             ) : (
               <>
