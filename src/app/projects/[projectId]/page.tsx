@@ -1,18 +1,11 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ArrowLeft,
-  AudioLines,
-  Building2,
-  CalendarClock,
-  UserRound,
-} from "lucide-react";
+import { ArrowLeft, AudioLines, CalendarClock, UserRound } from "lucide-react";
 
 import { ProjectDetailTabs } from "@/components/projects/project-detail-tabs";
 import { ProjectWorkflowBoard } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getInterviewScenarioLabel } from "@/lib/oral-history";
 import {
   getProjectById,
   isProjectOwnedBy,
@@ -72,23 +65,7 @@ export default async function ProjectDetailPage({
                 </div>
               </div>
 
-              <div className="flex flex-col items-start gap-2 xl:items-end">
-                <StatusBadge status={project.status} />
-                <div className="flex flex-wrap gap-2 text-sm text-muted">
-                  <div className="meta-pill">
-                    <AudioLines className="h-4 w-4 text-accent-strong" />
-                    受访音频已归档
-                  </div>
-                  <div className="meta-pill">
-                    <Building2 className="h-4 w-4 text-accent-strong" />
-                    {getInterviewScenarioLabel(project.collectionScenario)}
-                  </div>
-                  <div className="meta-pill">
-                    <CalendarClock className="h-4 w-4 text-accent-strong" />
-                    最近更新 {formatDateTime(project.updatedAt)}
-                  </div>
-                </div>
-              </div>
+              <StatusBadge status={project.status} />
             </div>
 
             <div className="grid gap-1.5 sm:grid-cols-3 sm:gap-2">

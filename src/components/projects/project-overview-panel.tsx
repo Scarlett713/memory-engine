@@ -158,7 +158,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             <div>
               <p className="section-eyebrow">访谈提纲</p>
               <h3 className="mt-1.5 text-base font-semibold text-foreground">
-                前置聊天生成草稿
+                已保存的提纲草稿
               </h3>
             </div>
 

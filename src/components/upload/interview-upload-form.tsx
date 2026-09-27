@@ -10,7 +10,6 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-import { MarkdownSheet } from "@/components/ui/markdown-sheet";
 import { Button } from "@/components/ui/button";
 import {
   OUTLINE_SESSION_STORAGE_KEY,
@@ -127,9 +126,6 @@ export function InterviewUploadForm() {
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>("standard");
   const [customRedactionRules, setCustomRedactionRules] =
     useState<RedactionRule[]>(defaultRules);
-  const [outlineDraftMarkdown] = useState(
-    () => initialSession?.outlineMarkdown || "",
-  );
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
@@ -191,7 +187,7 @@ export function InterviewUploadForm() {
         customScenarioLabel:
           collectionScenario === "custom" ? customScenarioLabel.trim() : "",
         notes: notes.trim(),
-        outlineDraftMarkdown,
+        outlineDraftMarkdown: "",
         projectName: projectName.trim(),
         collectionScenario,
         researchFocus: researchFocus.trim(),
@@ -649,24 +645,6 @@ export function InterviewUploadForm() {
               </div>
             </div>
 
-            <div className="surface-card rounded-[1.55rem] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="section-eyebrow">已带入提纲</p>
-                  <h3 className="mt-1.5 text-base font-semibold text-foreground">
-                    Markdown 草稿预览
-                  </h3>
-                </div>
-                <div className="tape-label">Outline</div>
-              </div>
-
-              <div className="soft-scroll mt-4 max-h-[360px] overflow-auto rounded-[1.2rem] border border-line/60 bg-white/60 p-4">
-                <MarkdownSheet
-                  markdown={outlineDraftMarkdown}
-                  emptyMessage="当前还没有从提纲页带入内容，你也可以返回上一步继续完善提纲。"
-                />
-              </div>
-            </div>
           </div>
         </div>
 
