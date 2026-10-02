@@ -1,8 +1,14 @@
-import { readFile, rm, writeFile } from "fs/promises";
+import { rm } from "fs/promises";
 import path from "path";
 import { nanoid } from "nanoid";
 
 import { buildCollectionPlan } from "@/lib/oral-history";
+import {
+  quarantineFile,
+  readJsonFile,
+  runExclusive,
+  writeJsonAtomic,
+} from "@/lib/server/json-store";
 import { ensureStorageLayout, getProjectsFilePath } from "@/lib/server/storage";
 import {
   createInitialWorkflow,
@@ -146,26 +152,45 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
   };
 }
 
-async function readProjects(): Promise<ProjectRecord[]> {
+function toProjectRecords(parsed: Partial<ProjectRecord>[]) {
+  return Array.isArray(parsed) ? parsed.map(normalizeProjectRecord) : [];
+}
+
+async function readProjectsInternal() {
   await ensureStorageLayout();
+  return readJsonFile<Partial<ProjectRecord>[]>(getProjectsFilePath());
+}
 
-  const fileContent = await readFile(getProjectsFilePath(), "utf8");
+// 读侧宽容：文件损坏时返回空列表，页面照常渲染，不白屏。
+async function readProjects(): Promise<ProjectRecord[]> {
+  const result = await readProjectsInternal();
 
-  try {
-    const parsed = JSON.parse(fileContent) as Partial<ProjectRecord>[];
-    return Array.isArray(parsed) ? parsed.map(normalizeProjectRecord) : [];
-  } catch {
+  return result.status === "ok" ? toProjectRecords(result.data) : [];
+}
+
+/**
+ * 写侧严格：写路径是全量覆盖（read → mutate → write 整个数组），
+ * 若在损坏数据上继续写，会把整个项目库替换成「一个新项目」。
+ * 故损坏时先留隔离副本再抛错，拒绝覆盖。
+ */
+async function readProjectsStrict(): Promise<ProjectRecord[]> {
+  const result = await readProjectsInternal();
+
+  if (result.status === "ok") {
+    return toProjectRecords(result.data);
+  }
+
+  if (result.status === "missing") {
     return [];
   }
+
+  await quarantineFile(getProjectsFilePath());
+  throw new Error("项目存储文件损坏，已保留隔离副本，本次写入已中止。");
 }
 
 async function writeProjects(projects: ProjectRecord[]) {
   await ensureStorageLayout();
-  await writeFile(
-    getProjectsFilePath(),
-    JSON.stringify(projects, null, 2),
-    "utf8",
-  );
+  await writeJsonAtomic(getProjectsFilePath(), projects);
 }
 
 function sortProjects(projects: ProjectRecord[]) {
@@ -252,12 +277,15 @@ export async function createProject(
     consentFormPath: "",
   };
 
-  const projects = await readProjects();
-  const nextProjects = sortProjects([newProject, ...projects]);
+  // 整个 read-modify-write 必须在锁内，只锁 write 仍会丢更新。
+  return runExclusive(getProjectsFilePath(), async () => {
+    const projects = await readProjectsStrict();
+    const nextProjects = sortProjects([newProject, ...projects]);
 
-  await writeProjects(nextProjects);
+    await writeProjects(nextProjects);
 
-  return newProject;
+    return newProject;
+  });
 }
 
 export async function updateProject(
@@ -266,48 +294,66 @@ export async function updateProject(
     | Partial<ProjectRecord>
     | ((project: ProjectRecord) => ProjectRecord | Partial<ProjectRecord>),
 ) {
-  const projects = await readProjects();
-  const currentProject = projects.find((project) => project.id === projectId);
+  return runExclusive(getProjectsFilePath(), async () => {
+    const projects = await readProjectsStrict();
+    const currentProject = projects.find((project) => project.id === projectId);
 
-  if (!currentProject) {
-    return null;
-  }
+    if (!currentProject) {
+      return null;
+    }
 
-  const updatePatch =
-    typeof updater === "function" ? updater(currentProject) : updater;
+    const updatePatch =
+      typeof updater === "function" ? updater(currentProject) : updater;
 
-  const nextProject: ProjectRecord = {
-    ...currentProject,
-    ...updatePatch,
-    updatedAt: updatePatch.updatedAt ?? new Date().toISOString(),
-  };
+    const nextProject: ProjectRecord = {
+      ...currentProject,
+      ...updatePatch,
+      updatedAt: updatePatch.updatedAt ?? new Date().toISOString(),
+    };
 
-  const nextProjects = projects.map((project) =>
-    project.id === projectId ? nextProject : project,
-  );
+    const nextProjects = projects.map((project) =>
+      project.id === projectId ? nextProject : project,
+    );
 
-  await writeProjects(sortProjects(nextProjects));
+    await writeProjects(sortProjects(nextProjects));
 
-  return nextProject;
+    return nextProject;
+  });
 }
 
 export async function deleteProject(projectId: string) {
-  const projects = await readProjects();
-  const currentProject = projects.find((project) => project.id === projectId);
+  // 锁只覆盖数据文件的读改写；音频文件清理留在锁外，避免拖长临界区。
+  const removedProject = await runExclusive(
+    getProjectsFilePath(),
+    async () => {
+      const projects = await readProjectsStrict();
+      const currentProject = projects.find(
+        (project) => project.id === projectId,
+      );
 
-  if (!currentProject) {
+      if (!currentProject) {
+        return null;
+      }
+
+      const nextProjects = projects.filter(
+        (project) => project.id !== projectId,
+      );
+      await writeProjects(sortProjects(nextProjects));
+
+      return currentProject;
+    },
+  );
+
+  if (!removedProject) {
     return false;
   }
 
-  const nextProjects = projects.filter((project) => project.id !== projectId);
-  await writeProjects(sortProjects(nextProjects));
-
-  if (currentProject.audioStoragePath) {
+  if (removedProject.audioStoragePath) {
     const storageDir = process.env.LOCAL_STORAGE_DIR?.trim() || "storage";
     const absoluteAudioPath = path.join(
       process.cwd(),
       storageDir,
-      currentProject.audioStoragePath,
+      removedProject.audioStoragePath,
     );
 
     try {

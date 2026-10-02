@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-dev/
 /out/
 
 # production
@@ -47,5 +48,6 @@ next-env.d.ts
 data/
 .env.local
 storage/*.bak
+storage/*.corrupt-*
 storage-backup-*/
 tmp/
