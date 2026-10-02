@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -10,6 +17,7 @@ import {
   LoaderCircle,
   Maximize2,
   PenLine,
+  RotateCcw,
   ScanText,
   ShieldAlert,
   Sparkles,
@@ -18,11 +26,36 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { EmotionSignal, ProjectRecord } from "@/lib/types/project";
+import { isExcerptMatchedByRules } from "@/lib/oral-history";
+import {
+  countPendingSensitiveMarks,
+  type EmotionSignal,
+  type ProjectRecord,
+  type RedactionRule,
+  type SensitiveMark,
+  type SensitiveMarkStatus,
+} from "@/lib/types/project";
 
 type ProjectProcessingConsoleProps = {
   project: ProjectRecord;
   autoStart?: boolean;
+};
+
+type MarkReviewUpdate = {
+  id: string;
+  status: SensitiveMarkStatus;
+};
+
+// 脱敏复核面板与父组件之间的唯一接口：面板只负责展示与收集操作，
+// 请求、loading、锁定态一律由父组件持有，避免内联/放大两个实例各持一份而分叉。
+type RedactionReviewController = {
+  busy: boolean;
+  // 仅承载「并发拒绝」这类面板级错误；单卡失败由卡片自己就地显示
+  error: string | null;
+  locked: boolean;
+  onReview: (
+    updates: MarkReviewUpdate[],
+  ) => Promise<{ ok: boolean; message?: string }>;
 };
 
 type TextPanelProps = {
@@ -142,42 +175,340 @@ function KeywordsPanel({
   );
 }
 
-function RedactionPanel({
-  notes,
-  marks,
-  dense = false,
+// 固定长度占位，不能按 excerpt.length 生成——否则遮盖本身会泄露原片段长度。
+const MASKED_EXCERPT_PLACEHOLDER = "••••••••";
+
+const MARK_STATUS_META: Record<
+  SensitiveMarkStatus,
+  { label: string; className: string }
+> = {
+  pending: { label: "待确认", className: "border-warning/25 bg-warning/12 text-warning" },
+  confirmed: { label: "已确认", className: "border-success/25 bg-success/10 text-success" },
+  revoked: { label: "已撤销", className: "border-line/60 bg-white/70 text-muted" },
+};
+
+const SMALL_ACTION_CLASS =
+  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50";
+
+// 必须定义在模块作用域：若写在 RedactionPanel 内部，每次 render 都会生成新的组件类型，
+// 整列表会被卸载重建，显隐状态与卡片内错误都会闪。
+function RedactionMarkCard({
+  mark,
+  rules,
+  isRevealed,
+  onToggleReveal,
+  locked,
+  busy,
+  onReview,
 }: {
-  notes: string[];
-  marks: ProjectRecord["sensitiveMarks"];
-  dense?: boolean;
+  mark: SensitiveMark;
+  rules: RedactionRule[];
+  isRevealed: boolean;
+  onToggleReveal: () => void;
+  locked: boolean;
+  busy: boolean;
+  onReview: RedactionReviewController["onReview"];
 }) {
+  const [localError, setLocalError] = useState<string | null>(null);
+  const statusMeta = MARK_STATUS_META[mark.status];
+  const needsAttention = mark.status === "pending" && mark.needsVerify;
+  // 撤销后仍会被自动规则强制脱敏，必须告知审校人「撤销不生效」的原因。
+  const stillMaskedByRules =
+    mark.status === "revoked" && isExcerptMatchedByRules(mark.excerpt, rules);
+
+  const submit = useCallback(
+    async (status: SensitiveMarkStatus) => {
+      setLocalError(null);
+      const result = await onReview([{ id: mark.id, status }]);
+
+      if (!result.ok) {
+        setLocalError(result.message ?? "操作失败，请重试");
+      }
+    },
+    [mark.id, onReview],
+  );
+
+  return (
+    <div
+      className={`rounded-[1.15rem] border p-4 ${
+        needsAttention ? "border-warning/30 bg-warning/10" : "border-warning/18 bg-warning/8"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-foreground">{mark.type}</p>
+          {needsAttention ? (
+            <span className="rounded-full border border-warning/30 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-warning">
+              【待人工核实】
+            </span>
+          ) : null}
+        </div>
+        <span
+          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}
+        >
+          {statusMeta.label}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        aria-expanded={isRevealed}
+        onClick={onToggleReveal}
+        className="mt-2 w-full rounded-[0.9rem] border border-line/50 bg-white/55 px-3 py-2 text-left transition-colors hover:bg-white/80"
+      >
+        <span className="text-xs font-semibold text-accent-strong">
+          {isRevealed ? "点击隐藏片段" : "点击查看片段"}
+        </span>
+        <span className="mt-1 block break-all text-sm leading-6 text-muted">
+          {isRevealed ? mark.excerpt : MASKED_EXCERPT_PLACEHOLDER}
+        </span>
+      </button>
+
+      <p className="mt-2 text-sm leading-6 text-muted">原因：{mark.reason}</p>
+
+      {stillMaskedByRules ? (
+        <p className="mt-2 rounded-[0.9rem] border border-warning/25 bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+          该片段同时命中自动规则，仍将脱敏
+        </p>
+      ) : null}
+
+      {localError ? <p className="mt-2 text-xs text-red-500">{localError}</p> : null}
+
+      {locked ? null : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {mark.status === "pending" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => submit("confirmed")}
+                disabled={busy}
+                className={`${SMALL_ACTION_CLASS} border-success/30 bg-success/10 text-success hover:bg-success/15`}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                确认脱敏
+              </button>
+              <button
+                type="button"
+                onClick={() => submit("revoked")}
+                disabled={busy}
+                className={`${SMALL_ACTION_CLASS} border-line/60 bg-white/70 text-muted hover:bg-white`}
+              >
+                <X className="h-3.5 w-3.5" />
+                撤销脱敏
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => submit("pending")}
+              disabled={busy}
+              className={`${SMALL_ACTION_CLASS} border-line/60 bg-white/70 text-accent-strong hover:bg-white`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              改回待确认
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type RedactionFilter = "all" | "pending" | "verify";
+
+const REDACTION_FILTERS: Array<{ value: RedactionFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "pending", label: "仅看待确认" },
+  { value: "verify", label: "仅看存疑" },
+];
+
+function RedactionPanel({
+  marks,
+  rules,
+  dense = false,
+  review,
+  lockedHint,
+}: {
+  marks: SensitiveMark[];
+  rules: RedactionRule[];
+  dense?: boolean;
+  review: RedactionReviewController;
+  lockedHint: string | null;
+}) {
+  const [filter, setFilter] = useState<RedactionFilter>("all");
+  // 按 mark.id 记显隐：卡片 key 含 status，状态一变会重挂载，显隐不能跟着丢。
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const [isBatching, setIsBatching] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+
+  // 先记下原数组下标，再排序与筛选——下标即 tiebreaker，显式保证同组内顺序稳定。
+  const { orderedMarks, counts, batchIds } = useMemo(() => {
+    const rank = (mark: SensitiveMark) => {
+      if (mark.status !== "pending") {
+        return 2;
+      }
+
+      return mark.needsVerify ? 0 : 1;
+    };
+
+    const ordered = marks
+      .map((mark, index) => ({ mark, index }))
+      .sort((left, right) => rank(left.mark) - rank(right.mark) || left.index - right.index);
+
+    const batchTargets = marks.filter(
+      (mark) => mark.status === "pending" && !mark.needsVerify,
+    );
+
+    return {
+      orderedMarks: ordered,
+      counts: {
+        total: marks.length,
+        pending: marks.filter((mark) => mark.status === "pending").length,
+        confirmed: marks.filter((mark) => mark.status === "confirmed").length,
+        revoked: marks.filter((mark) => mark.status === "revoked").length,
+        verify: marks.filter((mark) => mark.status === "pending" && mark.needsVerify).length,
+        batch: batchTargets.length,
+      },
+      batchIds: batchTargets.map((mark) => mark.id),
+    };
+  }, [marks]);
+
+  const toggleReveal = useCallback((id: string) => {
+    setRevealed((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const handleBatchConfirm = useCallback(async () => {
+    setIsBatching(true);
+    setBatchError(null);
+
+    try {
+      const result = await review.onReview(
+        batchIds.map((id) => ({ id, status: "confirmed" as const })),
+      );
+
+      if (!result.ok) {
+        setBatchError(result.message ?? "批量确认失败，请重试");
+      }
+    } finally {
+      setIsBatching(false);
+    }
+  }, [batchIds, review]);
+
+  const filterCounts: Record<RedactionFilter, number> = {
+    all: counts.total,
+    pending: counts.pending,
+    verify: counts.verify,
+  };
+
+  // 只按状态筛选，不重新排序——orderedMarks 的顺序已由上面的 sort 定死。
+  const visibleMarks = orderedMarks.filter(({ mark }) => {
+    if (filter === "pending") {
+      return mark.status === "pending";
+    }
+
+    if (filter === "verify") {
+      return mark.status === "pending" && mark.needsVerify;
+    }
+
+    return true;
+  });
+
   return (
     <SurfaceSection title="脱敏提示" icon={ShieldAlert} tag="Redaction" dense={dense}>
       <div>
-        {notes.length > 0 ? (
-          <ul className="space-y-2 text-sm leading-6 text-muted">
-            {notes.map((note, index) => (
-              <li key={`${note}-${index}`}>{index + 1}. {note}</li>
-            ))}
-          </ul>
+        {counts.total === 0 ? (
+          <p className="text-sm leading-6 text-muted">
+            本稿无需人工复核的 AI 标记；规则脱敏已自动执行。
+          </p>
         ) : (
-          <p className="text-sm leading-6 text-muted">暂无内容</p>
-        )}
+          <>
+            <p className="text-sm leading-6 text-muted">
+              共 {counts.total} 处 · 待确认 {counts.pending} · 已确认 {counts.confirmed} ·
+              已撤销 {counts.revoked} · 待核实 {counts.verify}
+            </p>
 
-        {marks.length > 0 ? (
-          <div className="mt-4 grid gap-3">
-            {marks.map((mark) => (
-              <div
-                key={mark.id}
-                className="rounded-[1.15rem] border border-warning/18 bg-warning/8 p-4"
-              >
-                <p className="text-sm font-semibold text-foreground">{mark.type}</p>
-                <p className="mt-2 text-sm leading-6 text-muted">片段：{mark.excerpt}</p>
-                <p className="mt-1 text-sm leading-6 text-muted">原因：{mark.reason}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {REDACTION_FILTERS.map((option) => {
+                const isActive = filter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFilter(option.value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      isActive
+                        ? "border-accent-soft bg-accent-soft/72 text-accent-strong"
+                        : "border-line/60 bg-white/70 text-muted hover:bg-white"
+                    }`}
+                  >
+                    {option.label} {filterCounts[option.value]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {lockedHint ? (
+              // T8：锁定态只提示一次，操作按钮整块收起，不在每张卡片上重复
+              <p className="mt-3 rounded-[0.9rem] border border-line/60 bg-white/55 px-3 py-2 text-xs leading-5 text-muted">
+                {lockedHint}
+              </p>
+            ) : (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={handleBatchConfirm}
+                  disabled={counts.batch === 0 || review.busy}
+                  className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-1.5 text-sm font-semibold text-success transition-colors hover:bg-success/15 disabled:opacity-50"
+                >
+                  {isBatching ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  批量确认 {counts.batch} 项（不含存疑）
+                </button>
+                {batchError ? (
+                  <p className="mt-2 text-xs text-red-500">{batchError}</p>
+                ) : null}
+                {review.error ? (
+                  <p className="mt-2 text-xs text-red-500">{review.error}</p>
+                ) : null}
               </div>
-            ))}
-          </div>
-        ) : null}
+            )}
+
+            <div className="mt-4 grid gap-3">
+              {visibleMarks.length > 0 ? (
+                visibleMarks.map(({ mark }) => (
+                  <RedactionMarkCard
+                    // 带上 status：状态跃迁时重挂载，卡片内的错误提示自动清掉；
+                    // 失败时状态未变，错误会保留——正是想要的。
+                    key={`${mark.id}:${mark.status}`}
+                    mark={mark}
+                    rules={rules}
+                    isRevealed={revealed.has(mark.id)}
+                    onToggleReveal={() => toggleReveal(mark.id)}
+                    locked={lockedHint !== null}
+                    busy={review.busy}
+                    onReview={review.onReview}
+                  />
+                ))
+              ) : (
+                <p className="text-sm leading-6 text-muted">当前筛选下没有敏感标记。</p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </SurfaceSection>
   );
@@ -244,7 +575,22 @@ function StructuredPanel({
   );
 }
 
-function ResultGrid({ project, expanded = false }: { project: ProjectRecord; expanded?: boolean }) {
+function ResultGrid({
+  project,
+  expanded = false,
+  review,
+}: {
+  project: ProjectRecord;
+  expanded?: boolean;
+  review: RedactionReviewController;
+}) {
+  // T8：非人工审校阶段一律只读，但文案要分状态——重新生成途中说「审校已完成」是错的。
+  const lockedHint = review.locked
+    ? project.status === "ready_to_export"
+      ? "审校已完成，标记已锁定"
+      : "当前阶段不可审校"
+    : null;
+
   return (
     <div className="grid gap-4">
       <div className={`grid gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
@@ -276,9 +622,11 @@ function ResultGrid({ project, expanded = false }: { project: ProjectRecord; exp
           <KeywordsPanel keywords={project.keywords} dense={expanded} />
           <EmotionPanel signals={project.emotionalSignals} dense={expanded} />
           <RedactionPanel
-            notes={project.redactionNotes}
             marks={project.sensitiveMarks}
+            rules={project.customRedactionRules}
             dense={expanded}
+            review={review}
+            lockedHint={lockedHint}
           />
         </div>
       </div>
@@ -314,7 +662,75 @@ export function ProjectProcessingConsole({
   const [exportingFormat, setExportingFormat] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const handleConfirmReview = useCallback(async () => {
+  // ── 脱敏标记逐条复核 ─────────────────────────────────────
+  const [isReviewSaving, setIsReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  // 同步守卫：isReviewSaving 是异步 state，同一帧的两次点击会一起穿过去
+  const reviewInFlightRef = useRef(false);
+
+  const handleReviewMarks = useCallback(
+    async (
+      updates: MarkReviewUpdate[],
+    ): Promise<{ ok: boolean; message?: string }> => {
+      if (updates.length === 0) {
+        return { ok: true };
+      }
+
+      if (reviewInFlightRef.current) {
+        const message = "操作进行中，请稍候。";
+        setReviewError(message);
+        return { ok: false, message };
+      }
+
+      reviewInFlightRef.current = true;
+      setIsReviewSaving(true);
+      setReviewError(null);
+
+      try {
+        const res = await fetch(`/api/projects/${project.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sensitiveMarks: updates.map((update) => ({
+              id: update.id,
+              status: update.status,
+              // 改回待确认时不传 reviewedAt：服务端 mergeMarkReviews 用 ?? 保留旧值，不清空
+              ...(update.status === "pending"
+                ? {}
+                : { reviewedAt: new Date().toISOString() }),
+            })),
+          }),
+        });
+        const data = (await res.json()) as {
+          project?: ProjectRecord;
+          message?: string;
+        };
+
+        if (!res.ok) {
+          throw new Error(data.message ?? "操作失败，请重试");
+        }
+
+        // 服务端返回完整 project，整体替换；不做乐观更新。
+        // 刻意不调 router.refresh()：会重渲染整棵 RSC 树造成闪屏（见 handleExport 里的注释）。
+        if (data.project) {
+          setCurrentProject(data.project);
+        }
+
+        return { ok: true };
+      } catch (e) {
+        return {
+          ok: false,
+          message: e instanceof Error ? e.message : "操作失败，请重试",
+        };
+      } finally {
+        reviewInFlightRef.current = false;
+        setIsReviewSaving(false);
+      }
+    },
+    [project.id],
+  );
+
+  const handleConfirmReview = useCallback(async (): Promise<boolean> => {
     setIsConfirming(true);
     setConfirmError(null);
     try {
@@ -336,8 +752,10 @@ export function ProjectProcessingConsole({
       if (!res.ok) throw new Error(data.message ?? '操作失败');
       if (data.project) setCurrentProject(data.project);
       router.refresh();
+      return true;
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : '操作失败，请重试');
+      return false;
     } finally {
       setIsConfirming(false);
     }
@@ -447,6 +865,37 @@ export function ProjectProcessingConsole({
     currentProject.status === "ai_refining";
   const isBusy = isProcessing || isProjectProcessing;
 
+  const pendingReviewCount = countPendingSensitiveMarks(currentProject.sensitiveMarks);
+  // 两个请求交叉禁用：复核落库前不该放行「完成审校」，确认审校期间面板按钮也要灰。
+  const reviewBusy = isReviewSaving || isConfirming;
+
+  const reviewController = useMemo<RedactionReviewController>(
+    () => ({
+      busy: reviewBusy,
+      error: reviewError,
+      locked: currentProject.status !== "manual_review",
+      onReview: handleReviewMarks,
+    }),
+    [reviewBusy, reviewError, currentProject.status, handleReviewMarks],
+  );
+
+  // T9：警示只在「用户主动点击」这一层拦。handleProcess 还被 autoStart 直接调用，
+  // 把 confirm 放进 handleProcess 会在自动启动时误弹。
+  const handleRegenerateClick = useCallback(() => {
+    const reviewedCount = currentProject.sensitiveMarks.filter(
+      (mark) => mark.status === "confirmed" || mark.status === "revoked",
+    ).length;
+
+    if (
+      reviewedCount > 0 &&
+      !window.confirm("重新生成将清空已有审校结果，是否继续？")
+    ) {
+      return;
+    }
+
+    handleProcess();
+  }, [currentProject.sensitiveMarks, handleProcess]);
+
   useEffect(() => {
     const shouldAutoStart =
       autoStart &&
@@ -512,7 +961,7 @@ export function ProjectProcessingConsole({
                 放大查看
               </Button>
             ) : null}
-            <Button onClick={() => handleProcess()} disabled={isBusy}>
+            <Button onClick={handleRegenerateClick} disabled={isBusy}>
               {isBusy ? (
                 <>
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -569,7 +1018,7 @@ export function ProjectProcessingConsole({
                     <button
                       type="button"
                       onClick={handleConfirmReview}
-                      disabled={isConfirming}
+                      disabled={reviewBusy || pendingReviewCount > 0}
                       className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-success/90 disabled:opacity-50"
                     >
                       {isConfirming ? (
@@ -577,7 +1026,20 @@ export function ProjectProcessingConsole({
                       ) : (
                         <CheckCircle2 className="h-3.5 w-3.5" />
                       )}
-                      {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+                      {isConfirming ? (
+                        '处理中…'
+                      ) : pendingReviewCount > 0 ? (
+                        <>
+                          <span className="xl:hidden">
+                            请先在整理结果中处理（还剩 {pendingReviewCount} 处待确认）
+                          </span>
+                          <span className="hidden xl:inline">
+                            还剩 {pendingReviewCount} 处待确认
+                          </span>
+                        </>
+                      ) : (
+                        '完成审校，解锁导出'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -643,11 +1105,16 @@ export function ProjectProcessingConsole({
                 >
                   <Maximize2 className="h-4 w-4" />
                   查看整理结果
+                  {pendingReviewCount > 0 ? (
+                    <span className="rounded-full bg-warning px-2 py-0.5 text-[11px] font-semibold text-white">
+                      {pendingReviewCount}
+                    </span>
+                  ) : null}
                 </button>
               </div>
 
               <div className="hidden xl:block">
-                <ResultGrid project={currentProject} />
+                <ResultGrid project={currentProject} review={reviewController} />
               </div>
             </>
           ) : null}
@@ -657,11 +1124,24 @@ export function ProjectProcessingConsole({
               <button
                 type="button"
                 onClick={handleConfirmReview}
-                disabled={isConfirming}
+                disabled={reviewBusy || pendingReviewCount > 0}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-success px-4 py-2.5 text-sm font-semibold text-white hover:bg-success/90 disabled:opacity-50"
               >
                 {isConfirming ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+                {isConfirming ? (
+                  '处理中…'
+                ) : pendingReviewCount > 0 ? (
+                  <>
+                    <span className="xl:hidden">
+                      请先在整理结果中处理（还剩 {pendingReviewCount} 处待确认）
+                    </span>
+                    <span className="hidden xl:inline">
+                      还剩 {pendingReviewCount} 处待确认
+                    </span>
+                  </>
+                ) : (
+                  '完成审校，解锁导出'
+                )}
               </button>
             </div>
           )}
@@ -681,20 +1161,33 @@ export function ProjectProcessingConsole({
                   <p className="mt-2 text-sm leading-6 text-muted">
                     更适合通读长文本；按 <span className="font-semibold text-accent-strong">Esc</span> 也可以关闭。
                   </p>
+                  {confirmError ? (
+                    <p className="mt-2 text-xs text-red-500">{confirmError}</p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   {currentProject.status === 'manual_review' ? (
                     <button
                       type="button"
-                      onClick={async () => { await handleConfirmReview(); setIsExpanded(false); }}
-                      disabled={isConfirming}
+                      onClick={async () => {
+                        // 失败时不关闭：用户要看到错误并能就地重试
+                        const ok = await handleConfirmReview();
+                        if (ok) setIsExpanded(false);
+                      }}
+                      disabled={reviewBusy || pendingReviewCount > 0}
                       className="inline-flex items-center gap-2 rounded-full bg-success px-4 py-2 text-sm font-semibold text-white hover:bg-success/90 disabled:opacity-50 transition-colors"
                     >
                       {isConfirming
                         ? <LoaderCircle className="h-4 w-4 animate-spin" />
                         : <CheckCircle2 className="h-4 w-4" />}
-                      {isConfirming ? '处理中…' : '完成审校，解锁导出'}
+                      {isConfirming ? (
+                        '处理中…'
+                      ) : pendingReviewCount > 0 ? (
+                        `还剩 ${pendingReviewCount} 处待确认`
+                      ) : (
+                        '完成审校，解锁导出'
+                      )}
                     </button>
                   ) : null}
                   <Button
@@ -709,7 +1202,7 @@ export function ProjectProcessingConsole({
               </div>
 
               <div className="soft-scroll mt-4 min-h-0 flex-1 overflow-auto pr-1">
-                <ResultGrid project={currentProject} expanded />
+                <ResultGrid project={currentProject} expanded review={reviewController} />
               </div>
             </div>
           </div>

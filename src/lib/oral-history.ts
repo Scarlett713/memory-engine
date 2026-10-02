@@ -352,45 +352,38 @@ function replaceAllSafe(text: string, search: string, replacement: string) {
   return text.split(search).join(replacement);
 }
 
+// 与 isExcerptMatchedByRules 共用同一份字面量，避免两处正则漂移。
+const PHONE_RE = /(?<!\d)(1[3-9]\d{9})(?!\d)/g;
+const ID_CARD_RE = /(?<!\d)(\d{17}[\dXx]|\d{15})(?!\d)/g;
+const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const CONTACT_ACCOUNT_RE = /(微信|vx|VX|QQ)[:：]?\s*([A-Za-z0-9_-]{5,20})/g;
+const ADDRESS_RE = /(住址|地址|家庭住址|现住地)[:：]?\s*([^\n，。；;]{4,40})/g;
+const ORGANIZATION_RE = /(工作单位|所在机构|学校|单位名称)[:：]?\s*([^\n，。；;]{2,30})/g;
+
 function maskByRules(text: string, rules: RedactionRule[], level: PrivacyLevel) {
   let nextText = text;
   const activeRules = new Set(rules);
 
   if (activeRules.has("phone")) {
-    nextText = nextText.replace(
-      /(?<!\d)(1[3-9]\d{9})(?!\d)/g,
-      "[已脱敏-手机号]",
-    );
+    nextText = nextText.replace(PHONE_RE, "[已脱敏-手机号]");
   }
 
   if (activeRules.has("id_card")) {
-    nextText = nextText.replace(
-      /(?<!\d)(\d{17}[\dXx]|\d{15})(?!\d)/g,
-      "[已脱敏-身份证号]",
-    );
+    nextText = nextText.replace(ID_CARD_RE, "[已脱敏-身份证号]");
   }
 
   if (activeRules.has("contact_account")) {
     nextText = nextText
-      .replace(
-        /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-        "[已脱敏-邮箱]",
-      )
-      .replace(/(微信|vx|VX|QQ)[:：]?\s*([A-Za-z0-9_-]{5,20})/g, "$1：[已脱敏]");
+      .replace(EMAIL_RE, "[已脱敏-邮箱]")
+      .replace(CONTACT_ACCOUNT_RE, "$1：[已脱敏]");
   }
 
   if (activeRules.has("address")) {
-    nextText = nextText.replace(
-      /(住址|地址|家庭住址|现住地)[:：]?\s*([^\n，。；;]{4,40})/g,
-      "$1：[已脱敏-地址]",
-    );
+    nextText = nextText.replace(ADDRESS_RE, "$1：[已脱敏-地址]");
   }
 
   if (activeRules.has("organization")) {
-    nextText = nextText.replace(
-      /(工作单位|所在机构|学校|单位名称)[:：]?\s*([^\n，。；;]{2,30})/g,
-      "$1：[已脱敏-机构]",
-    );
+    nextText = nextText.replace(ORGANIZATION_RE, "$1：[已脱敏-机构]");
   }
 
   if (level === "strict") {
@@ -403,6 +396,54 @@ function maskByRules(text: string, rules: RedactionRule[], level: PrivacyLevel) 
   }
 
   return nextText;
+}
+
+// 判断单个片段是否会被 customRedactionRules 命中，供审校面板提示「仍将脱敏」用。
+// 与 maskByRules 共用上面的正则字面量的 source，二者不会漂移。
+// 已知局限（demo 接受）：
+//  - strict 级日期脱敏由 privacyLevel 决定，不属于 rules，故不在此判定；
+//  - "name" 规则在 maskByRules 中没有实现分支，故恒不命中；
+//  - address / organization 依赖前缀词，缺前缀的片段会漏报。
+export function isExcerptMatchedByRules(
+  excerpt: string,
+  rules: RedactionRule[],
+): boolean {
+  if (!excerpt) {
+    return false;
+  }
+
+  const activeRules = new Set(rules);
+
+  // 用不带 /g 的新实例做 test，避免推进上面共享常量的 lastIndex。
+  if (activeRules.has("phone") && new RegExp(PHONE_RE.source).test(excerpt)) {
+    return true;
+  }
+
+  if (activeRules.has("id_card") && new RegExp(ID_CARD_RE.source).test(excerpt)) {
+    return true;
+  }
+
+  if (activeRules.has("contact_account")) {
+    const hitEmail = new RegExp(EMAIL_RE.source, "i").test(excerpt);
+    const hitAccount = new RegExp(CONTACT_ACCOUNT_RE.source).test(excerpt);
+
+    if (hitEmail || hitAccount) {
+      return true;
+    }
+  }
+
+  if (activeRules.has("address") && new RegExp(ADDRESS_RE.source).test(excerpt)) {
+    return true;
+  }
+
+  if (
+    activeRules.has("organization") &&
+    new RegExp(ORGANIZATION_RE.source).test(excerpt)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function applyRedactionProfile(input: {
