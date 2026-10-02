@@ -61,12 +61,28 @@ export type CollectionPlan = {
   safetyTips: string[];
 };
 
+export type SensitiveMarkStatus = "pending" | "confirmed" | "revoked";
+
+// source 为后续「规则命中项也进审校列表」预留；本轮只有 'ai' 有写入方。
+export type SensitiveMarkSource = "ai" | "custom_rule";
+
 export type SensitiveMark = {
   id: string;
   type: string;
   excerpt: string;
   reason: string;
+  // 审校状态：revoked 的标记不再参与脱敏
+  status: SensitiveMarkStatus;
+  // AI 拿不准是否公开时标 true，交人工判断
+  needsVerify: boolean;
+  source: SensitiveMarkSource;
+  reviewedAt?: string;
 };
+
+// 审校门禁：PATCH 与导出路由共用同一判定，避免两处漂移
+export function countPendingSensitiveMarks(marks: SensitiveMark[]) {
+  return marks.filter((mark) => mark.status === "pending").length;
+}
 
 export type TranscriptSegment = {
   id: string;

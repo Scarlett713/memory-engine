@@ -91,6 +91,8 @@ function normalizeSensitiveMarks(value: unknown): LlmSensitiveMark[] {
       const excerpt =
         typeof mark.excerpt === "string" ? mark.excerpt.trim() : "";
       const reason = typeof mark.reason === "string" ? mark.reason.trim() : "";
+      // 严格等值判断：字段缺失、null、字符串 "true" 一律落 false
+      const needsVerify = mark.needsVerify === true;
 
       if (!type || !excerpt) {
         return null;
@@ -100,6 +102,7 @@ function normalizeSensitiveMarks(value: unknown): LlmSensitiveMark[] {
         type,
         excerpt,
         reason: reason || "需要人工复核。",
+        needsVerify,
       };
     })
     .filter((item): item is LlmSensitiveMark => Boolean(item));
@@ -271,7 +274,9 @@ export class ArkLlmProvider implements LlmProvider {
         summary: "",
         keywords: [""],
         redactionNotes: [""],
-        sensitiveMarks: [{ type: "", excerpt: "", reason: "" }],
+        sensitiveMarks: [
+          { type: "", excerpt: "", reason: "", needsVerify: false },
+        ],
         emotionalSignals: [
           { label: "", level: "notice", excerpt: "", guidance: "" },
         ],
@@ -283,7 +288,7 @@ export class ArkLlmProvider implements LlmProvider {
       "2. summary should be concise and accurate.",
       "3. keywords should contain 3 to 6 topical terms.",
       "4. emotionalSignals should identify emotional fluctuation, trauma cues, or safety-sensitive passages.",
-      "5. sensitiveMarks should capture names, phone numbers, ID numbers, exact home addresses, institutions, or other sensitive identifiers when present.",
+      "5. 标记私人敏感信息：普通个人姓名、联系方式、家庭住址、私人身份信息。以下不标记：政府机关、公共机构、知名企业、公开地名、以公共身份被提及的历史人物和公众人物。同名私人、单位内部非公开部门、非公开个人经历细节仍须标记。无法确定是否公开时仍输出标记但带 needsVerify: true。AI 不自行决定跳过。",
       "6. structuredSections should organize the transcript into academic/archive-friendly sections.",
       "7. timelineEvents should extract key events or life stages in chronological form when possible.",
       "Transcript:",

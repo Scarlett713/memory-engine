@@ -21,6 +21,8 @@ export type LlmSensitiveMark = {
   type: string;
   excerpt: string;
   reason: string;
+  // 归一化后的类型，normalizeSensitiveMarks 保证该字段存在（模型没返回时落 false）
+  needsVerify: boolean;
 };
 
 export type LlmEmotionSignal = {

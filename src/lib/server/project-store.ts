@@ -12,6 +12,7 @@ import {
   type PrivacyLevel,
   type ProjectRecord,
   type RedactionRule,
+  type SensitiveMark,
   type UserType,
 } from "@/lib/types/project";
 
@@ -122,8 +123,16 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
     redactionNotes: Array.isArray(project.redactionNotes)
       ? project.redactionNotes
       : [],
+    // 存量标记没有 status/source/needsVerify 字段，读时逐条补齐默认值。
+    // 门禁（countPendingSensitiveMarks）依赖这里的补齐：缺 status 的旧数据按 pending 处理，
+    // 否则 undefined 不匹配 "pending"，未审校的旧项目会被直接放行到 ready_to_export。
     sensitiveMarks: Array.isArray(project.sensitiveMarks)
-      ? project.sensitiveMarks
+      ? (project.sensitiveMarks as Array<Partial<SensitiveMark>>).map((mark) => ({
+          ...mark,
+          status: mark.status ?? "pending",
+          source: mark.source ?? "ai",
+          needsVerify: mark.needsVerify ?? false,
+        })) as SensitiveMark[]
       : [],
     lastProcessingError:
       typeof project.lastProcessingError === "string"

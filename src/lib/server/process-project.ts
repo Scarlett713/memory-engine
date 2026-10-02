@@ -12,6 +12,7 @@ import { getProjectById, updateProject } from "@/lib/server/project-store";
 import { postProcessTranscriptionResult } from "@/lib/server/transcript-postprocess";
 import type {
   ProjectRecord,
+  SensitiveMark,
   WorkflowStep,
   WorkflowStepKey,
   WorkflowStatus,
@@ -89,10 +90,16 @@ export async function processProject(projectId: string) {
       customRedactionRules: project.customRedactionRules,
     });
 
-    const sensitiveMarks = llmResult.sensitiveMarks.map((mark) => ({
-      id: nanoid(6),
-      ...mark,
-    }));
+    // 显式字段放在 ...mark 之后：即便模型越权返回 status/source 也不会覆盖
+    const sensitiveMarks: SensitiveMark[] = llmResult.sensitiveMarks.map(
+      (mark) => ({
+        id: nanoid(6),
+        ...mark,
+        status: "pending",
+        source: "ai",
+        needsVerify: mark.needsVerify ?? false,
+      }),
+    );
     const transcriptForRedaction = processedTranscription.text || "";
     const aiDraftForRedaction = llmResult.aiDraft || transcriptForRedaction;
     const redactedTranscript = applyRedactionProfile({
