@@ -5,6 +5,7 @@ import {
   applyRedactionProfile,
   createFallbackStructuredSections,
   createFallbackTimeline,
+  hasInlineRedactionPlaceholder,
 } from "@/lib/oral-history";
 import { getLlmProvider } from "@/lib/providers/llm";
 import { getTranscriptionProvider } from "@/lib/providers/transcription";
@@ -100,6 +101,21 @@ export async function processProject(projectId: string) {
         needsVerify: mark.needsVerify ?? false,
       }),
     );
+    // ① 检测必须在任何 applyRedactionProfile 之前，且只读 llmResult 原始输出。
+    // 若改读 redactedAiDraft / redactedSummary，其中已含后端产出的 [已脱敏-xxx]，必然误报。
+    const selfRedactedFields = [
+      hasInlineRedactionPlaceholder(llmResult.aiDraft) ? "整理稿" : "",
+      hasInlineRedactionPlaceholder(llmResult.summary) ? "摘要" : "",
+    ].filter(Boolean);
+
+    const redactionNotes =
+      selfRedactedFields.length > 0
+        ? [
+            ...llmResult.redactionNotes,
+            `模型在${selfRedactedFields.join("、")}中自行做了脱敏替换，原文可能已丢失，请人工核对并从转写稿补齐。`,
+          ]
+        : llmResult.redactionNotes;
+
     const transcriptForRedaction = processedTranscription.text || "";
     const aiDraftForRedaction = llmResult.aiDraft || transcriptForRedaction;
     const redactedTranscript = applyRedactionProfile({
@@ -115,10 +131,19 @@ export async function processProject(projectId: string) {
       sensitiveMarks,
     });
 
+    // ② summary 此前从不脱敏，却原样进 docx/txt 导出与问答 prompt。
+    // prompt 已要求模型不自行脱敏，故这里必须补上后端脱敏，否则原始 PII 会写进导出文件。
+    const redactedSummary = applyRedactionProfile({
+      text: llmResult.summary,
+      level: project.privacyLevel,
+      rules: project.customRedactionRules,
+      sensitiveMarks,
+    });
+
     const processedProject = await updateProject(projectId, (current) => ({
       lastProcessingError: null,
       status: "manual_review",
-      summary: llmResult.summary,
+      summary: redactedSummary,
       keywords: llmResult.keywords,
       aiDraft: llmResult.aiDraft,
       redactedTranscript,
@@ -128,7 +153,7 @@ export async function processProject(projectId: string) {
       manualDraft: current.manualDraft.trim()
         ? current.manualDraft
         : redactedAiDraft,
-      redactionNotes: llmResult.redactionNotes,
+      redactionNotes,
       sensitiveMarks,
       emotionalSignals: llmResult.emotionalSignals.map((signal) => ({
         id: nanoid(6),
@@ -144,7 +169,7 @@ export async function processProject(projectId: string) {
               aiDraft: redactedAiDraft,
               notes: current.notes,
               researchFocus: current.researchFocus,
-              summary: llmResult.summary,
+              summary: redactedSummary,
             }),
       timelineEvents:
         llmResult.timelineEvents.length > 0

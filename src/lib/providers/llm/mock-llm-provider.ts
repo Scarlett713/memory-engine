@@ -100,7 +100,9 @@ export class MockLlmProvider implements LlmProvider {
       sensitiveMarks: [
         {
           type: "家庭住址",
-          excerpt: "老城厢某条石库门弄堂",
+          // 必须逐字出现在本 provider 自己的 aiDraft/summary 中，否则「标记→替换」通道
+          // 在 mock 模式下测不出来（这里 aiDraft 写的是「早年居住于老城厢」）。
+          excerpt: "老城厢",
           reason: "可能指向具体家庭住址，需要公开传播前泛化处理。",
           needsVerify: false,
         },
