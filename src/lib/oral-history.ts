@@ -413,7 +413,13 @@ export function applyRedactionProfile(input: {
 }) {
   let nextText = input.text.trim();
 
-  const sortedMarks = [...input.sensitiveMarks].sort(
+  // 已撤销的标记不再参与脱敏。
+  // 存量标记缺 status 时 undefined !== "revoked" 为 true，等价于按 pending 处理（不跳过）。
+  const activeMarks = input.sensitiveMarks.filter(
+    (mark) => mark.status !== "revoked",
+  );
+
+  const sortedMarks = [...activeMarks].sort(
     (left, right) => right.excerpt.length - left.excerpt.length,
   );
 

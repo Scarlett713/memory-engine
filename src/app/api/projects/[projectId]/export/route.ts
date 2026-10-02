@@ -9,6 +9,7 @@ import {
   isProjectOwnedBy,
   updateProject,
 } from "@/lib/server/project-store";
+import { countPendingSensitiveMarks } from "@/lib/types/project";
 import type { WorkflowStep, WorkflowStepKey, WorkflowStatus } from "@/lib/types/project";
 
 type RouteContext = {
@@ -59,6 +60,20 @@ export async function GET(request: Request, context: RouteContext) {
   if (!project.aiDraft && !project.redactedAiDraft) {
     return NextResponse.json(
       { message: "项目尚未生成可导出的整理结果。" },
+      { status: 400 },
+    );
+  }
+
+  // 审校门禁：还有待处理标记时不导出，也不把状态推成 ready_to_export。
+  // PATCH 路由有同一判定（共用 countPendingSensitiveMarks），否则点导出就能绕过审校。
+  const pendingCount = countPendingSensitiveMarks(project.sensitiveMarks);
+
+  if (pendingCount > 0) {
+    return NextResponse.json(
+      {
+        message: `还有 ${pendingCount} 条敏感标记待处理，无法导出。`,
+        pendingCount,
+      },
       { status: 400 },
     );
   }

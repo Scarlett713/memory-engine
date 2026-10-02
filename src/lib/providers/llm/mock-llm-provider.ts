@@ -102,6 +102,7 @@ export class MockLlmProvider implements LlmProvider {
           type: "家庭住址",
           excerpt: "老城厢某条石库门弄堂",
           reason: "可能指向具体家庭住址，需要公开传播前泛化处理。",
+          needsVerify: false,
         },
       ],
       emotionalSignals: [
