@@ -16,6 +16,8 @@ import {
 
 import {
   applyRedactionProfile,
+  getCollectionPathLabel,
+  getConfidentialityLevelLabel,
   getInterviewScenarioDisplayLabel,
   getPrivacyLevelLabel,
   getRedactionRuleLabel,
@@ -74,6 +76,8 @@ function createMetadataRows(project: ProjectRecord) {
       ),
     ],
     ["研究焦点", project.researchFocus || "未填写"],
+    ["保密级别", getConfidentialityLevelLabel(project.confidentialityLevel)],
+    ["采集路径", getCollectionPathLabel(project.collectionPath)],
     ["脱敏级别", getPrivacyLevelLabel(project.privacyLevel)],
     [
       "脱敏规则",
@@ -257,6 +261,10 @@ function buildArchivePayload(project: ProjectRecord) {
       ),
       researchFocus: project.researchFocus,
       notes: project.notes,
+      confidentialityLevel: getConfidentialityLevelLabel(
+        project.confidentialityLevel,
+      ),
+      collectionPath: getCollectionPathLabel(project.collectionPath),
       privacyLevel: getPrivacyLevelLabel(project.privacyLevel),
       customRedactionRules: project.customRedactionRules.map(getRedactionRuleLabel),
       createdAt: project.createdAt,
@@ -425,6 +433,8 @@ function buildTxt(project: ProjectRecord) {
     `整理机构：${project.institutionName || "未填写"}`,
     `口述场景：${getInterviewScenarioDisplayLabel(project.collectionScenario, project.customScenarioLabel)}`,
     `研究焦点：${project.researchFocus || "未填写"}`,
+    `保密级别：${getConfidentialityLevelLabel(project.confidentialityLevel)}`,
+    `采集路径：${getCollectionPathLabel(project.collectionPath)}`,
     `脱敏级别：${getPrivacyLevelLabel(project.privacyLevel)}`,
     `脱敏规则：${project.customRedactionRules.map(getRedactionRuleLabel).join("、") || "未设置"}`,
     "",

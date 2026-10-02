@@ -3,6 +3,8 @@
 import { create } from "zustand";
 
 import type {
+  CollectionPath,
+  ConfidentialityLevel,
   InterviewScenario,
   PrivacyLevel,
   ProjectRecord,
@@ -20,6 +22,8 @@ type CreateProjectPayload = {
   collectionScenario: InterviewScenario;
   researchFocus: string;
   privacyLevel: PrivacyLevel;
+  confidentialityLevel: ConfidentialityLevel;
+  collectionPath: CollectionPath;
   customRedactionRules: RedactionRule[];
   language: string;
 };
@@ -85,6 +89,8 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
       formData.set("collectionScenario", payload.collectionScenario);
       formData.set("researchFocus", payload.researchFocus);
       formData.set("privacyLevel", payload.privacyLevel);
+      formData.set("confidentialityLevel", payload.confidentialityLevel);
+      formData.set("collectionPath", payload.collectionPath);
       formData.set("language", payload.language || "cn");
       formData.set(
         "customRedactionRules",
