@@ -357,8 +357,10 @@ const PHONE_RE = /(?<!\d)(1[3-9]\d{9})(?!\d)/g;
 const ID_CARD_RE = /(?<!\d)(\d{17}[\dXx]|\d{15})(?!\d)/g;
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const CONTACT_ACCOUNT_RE = /(微信|vx|VX|QQ)[:：]?\s*([A-Za-z0-9_-]{5,20})/g;
-const ADDRESS_RE = /(住址|地址|家庭住址|现住地)[:：]?\s*([^\n，。；;]{4,40})/g;
-const ORGANIZATION_RE = /(工作单位|所在机构|学校|单位名称)[:：]?\s*([^\n，。；;]{2,30})/g;
+// 尾部字符类排除方括号：maskByRules 跑在标记替换之后，若不排除，
+// 规则会把上一步产出的 [已脱敏-xxx] 再次吞掉，产生 [住址：[已脱敏-地址] 这类嵌套。
+const ADDRESS_RE = /(住址|地址|家庭住址|现住地)[:：]?\s*([^\n，。；;\[\]]{4,40})/g;
+const ORGANIZATION_RE = /(工作单位|所在机构|学校|单位名称)[:：]?\s*([^\n，。；;\[\]]{2,30})/g;
 
 function maskByRules(text: string, rules: RedactionRule[], level: PrivacyLevel) {
   let nextText = text;
@@ -444,6 +446,17 @@ export function isExcerptMatchedByRules(
   }
 
   return false;
+}
+
+// 检测文本里是否残留「模型自行脱敏」的痕迹。
+// 只对模型原始输出使用：后端自己产出的 [已脱敏-xxx] 同样会命中，
+// 故调用方必须传 llmResult.aiDraft / llmResult.summary，不能传脱敏后的结果，否则必然误报。
+// 不带 /g，避免 test() 的 lastIndex 在多次调用间残留。
+const INLINE_REDACTION_PLACEHOLDER_RE =
+  /\[[^\[\]]{0,30}(脱敏|已隐藏|已省略|已遮蔽)[^\[\]]{0,30}\]/;
+
+export function hasInlineRedactionPlaceholder(text: string): boolean {
+  return INLINE_REDACTION_PLACEHOLDER_RE.test(text);
 }
 
 export function applyRedactionProfile(input: {
