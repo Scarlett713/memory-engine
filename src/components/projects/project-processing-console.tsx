@@ -26,9 +26,13 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { isExcerptMatchedByRules } from "@/lib/oral-history";
+import {
+  getEmotionLevelLabel,
+  isExcerptMatchedByRules,
+} from "@/lib/oral-history";
 import {
   countPendingSensitiveMarks,
+  type CollectionPath,
   type EmotionSignal,
   type ProjectRecord,
   type RedactionRule,
@@ -93,6 +97,17 @@ function SurfaceSection({
   );
 }
 
+// 四类要素的统一空态：虚线边框占位块 + muted 文案。
+// 文案只表述「未提取到」，不暗示「系统确认没有问题」。
+// w-full 必需：关键词面板的外层是 flex flex-wrap，没有它占位块会缩到文字宽度。
+function ElementEmptyState({ message }: { message: string }) {
+  return (
+    <div className="w-full rounded-[1.1rem] border border-dashed border-line/70 bg-white/40 px-4 py-5 text-sm leading-6 text-muted">
+      {message}
+    </div>
+  );
+}
+
 function TextPanel({ title, icon: Icon, content, tag, dense = false }: TextPanelProps) {
   return (
     <SurfaceSection title={title} icon={Icon} tag={tag} dense={dense}>
@@ -105,9 +120,11 @@ function TextPanel({ title, icon: Icon, content, tag, dense = false }: TextPanel
 
 function EmotionPanel({
   signals,
+  collectionPath,
   dense = false,
 }: {
   signals: EmotionSignal[];
+  collectionPath?: CollectionPath;
   dense?: boolean;
 }) {
   const levelStyleMap = {
@@ -115,6 +132,15 @@ function EmotionPanel({
     warning: "border-warning/20 bg-warning/10 text-warning",
     high: "border-danger/20 bg-danger/10 text-danger",
   } as const;
+
+  // 肯定分支判 ai_interview，而不是判 upload。
+  // collectionPath 可选，REQ-03 之前创建的项目该字段缺失，undefined 是真实存在的取值，
+  // 而全仓库的缺省语义一律是 "upload"（project-store 写入默认值、getCollectionPathLabel 兜底），
+  // 所以 undefined 必须与 "upload" 走同一分支。
+  const emptyMessage =
+    collectionPath === "ai_interview"
+      ? "未识别到需要重点关注的情绪片段。"
+      : "该采集路径暂不提供情绪提示。";
 
   return (
     <SurfaceSection
@@ -133,7 +159,7 @@ function EmotionPanel({
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold">{signal.label}</p>
                 <span className="rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em]">
-                  {signal.level}
+                  {getEmotionLevelLabel(signal.level)}
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6">片段：{signal.excerpt}</p>
@@ -141,7 +167,9 @@ function EmotionPanel({
             </div>
           ))
         ) : (
-          <p className="text-sm leading-6 text-muted">暂无需要重点关注的情绪风险片段。</p>
+          // 空态才按采集路径分流。upload 路径下若模型仍然返回了情绪信号，
+          // 上面的 signals.map 照常渲染，不隐藏。
+          <ElementEmptyState message={emptyMessage} />
         )}
       </div>
     </SurfaceSection>
@@ -168,7 +196,7 @@ function KeywordsPanel({
             </span>
           ))
         ) : (
-          <p className="text-sm text-muted">暂无内容</p>
+          <ElementEmptyState message="暂未提取到主题关键词。" />
         )}
       </div>
     </SurfaceSection>
@@ -538,7 +566,7 @@ function TimelinePanel({
             </div>
           ))
         ) : (
-          <p className="text-sm leading-6 text-muted">暂无时间线内容。</p>
+          <ElementEmptyState message="暂未提取到要素标引。转写内容较短或缺少明确时间、事件线索时可能出现，建议对照转写稿人工核对。" />
         )}
       </div>
     </SurfaceSection>
@@ -568,7 +596,7 @@ function StructuredPanel({
             </div>
           ))
         ) : (
-          <p className="text-sm leading-6 text-muted">暂无结构化内容。</p>
+          <ElementEmptyState message="暂无结构化内容。" />
         )}
       </div>
     </SurfaceSection>
@@ -620,7 +648,11 @@ function ResultGrid({
             dense={expanded}
           />
           <KeywordsPanel keywords={project.keywords} dense={expanded} />
-          <EmotionPanel signals={project.emotionalSignals} dense={expanded} />
+          <EmotionPanel
+            signals={project.emotionalSignals}
+            collectionPath={project.collectionPath}
+            dense={expanded}
+          />
           <RedactionPanel
             marks={project.sensitiveMarks}
             rules={project.customRedactionRules}
