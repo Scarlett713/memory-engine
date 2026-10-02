@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AudioLines,
+  Check,
   ChevronLeft,
   FileText,
   LoaderCircle,
@@ -409,9 +410,9 @@ export function InterviewUploadForm() {
                     return (
                       <label
                         key={option.value}
-                        className={`rounded-[1.1rem] border px-4 py-3 text-sm transition-colors ${
+                        className={`relative rounded-[1.1rem] border py-3 pl-4 pr-8 text-sm transition-colors has-focus-visible:ring-2 has-focus-visible:ring-accent-strong/40 ${
                           isActive
-                            ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                            ? "border-accent-strong bg-accent-soft/70 text-accent-strong"
                             : "border-line/80 bg-white/55 text-muted"
                         }`}
                       >
@@ -428,6 +429,15 @@ export function InterviewUploadForm() {
                         <span className="mt-1.5 block text-xs leading-5">
                           {option.description}
                         </span>
+                        {isActive ? (
+                          <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-accent-strong text-white">
+                            <Check
+                              aria-hidden
+                              className="h-3 w-3"
+                              strokeWidth={3}
+                            />
+                          </span>
+                        ) : null}
                       </label>
                     );
                   })}
@@ -537,9 +547,9 @@ export function InterviewUploadForm() {
                       return (
                         <label
                           key={option.value}
-                          className={`rounded-[1.1rem] border px-4 py-3 text-sm transition-colors ${
+                          className={`relative rounded-[1.1rem] border py-3 pl-4 pr-8 text-sm transition-colors has-focus-visible:ring-2 has-focus-visible:ring-accent-strong/40 ${
                             isActive
-                              ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                              ? "border-accent-strong bg-accent-soft/70 text-accent-strong"
                               : "border-line/80 bg-white/55 text-muted"
                           }`}
                         >
@@ -550,6 +560,15 @@ export function InterviewUploadForm() {
                             onChange={() => toggleRedactionRule(option.value)}
                           />
                           {option.label}
+                          {isActive ? (
+                            <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-accent-strong text-white">
+                              <Check
+                                aria-hidden
+                                className="h-3 w-3"
+                                strokeWidth={3}
+                              />
+                            </span>
+                          ) : null}
                         </label>
                       );
                     })}
@@ -568,11 +587,11 @@ export function InterviewUploadForm() {
                 return (
                   <label
                     key={option.value}
-                    className={`rounded-[1.4rem] border-2 p-5 transition-colors ${
+                    className={`relative rounded-[1.4rem] border-2 p-5 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-accent-strong/40 ${
                       isDisabled
                         ? "cursor-not-allowed border-line/60 bg-white/40 text-muted/70"
                         : isActive
-                          ? "cursor-pointer border-accent-soft bg-accent-soft/70 text-accent-strong"
+                          ? "cursor-pointer border-accent-strong bg-accent-soft/70 text-accent-strong"
                           : "cursor-pointer border-line/80 bg-white/55 text-muted"
                     }`}
                   >
@@ -589,6 +608,14 @@ export function InterviewUploadForm() {
                       {isDisabled ? (
                         <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-muted">
                           即将开放
+                        </span>
+                      ) : isActive ? (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-strong text-white">
+                          <Check
+                            aria-hidden
+                            className="h-3 w-3"
+                            strokeWidth={3}
+                          />
                         </span>
                       ) : null}
                     </div>
@@ -637,7 +664,7 @@ export function InterviewUploadForm() {
                   <div className="tape-label">Audio</div>
                 </div>
 
-                <div className="mt-3 flex flex-1">
+                <div className="relative mt-3 flex flex-1">
                   <button
                     type="button"
                     className="file-trigger min-h-[10rem] w-full text-left"
