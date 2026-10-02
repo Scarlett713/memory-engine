@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -25,6 +26,8 @@ import {
   X,
 } from "lucide-react";
 
+import { ElementEmptyState, SurfaceSection } from "@/components/projects/element-shell";
+import { TimelinePanel } from "@/components/projects/timeline-panel";
 import { Button } from "@/components/ui/button";
 import {
   getEmotionLevelLabel,
@@ -69,44 +72,6 @@ type TextPanelProps = {
   tag: string;
   dense?: boolean;
 };
-
-function SurfaceSection({
-  title,
-  icon: Icon,
-  tag,
-  children,
-  dense = false,
-}: {
-  title: string;
-  icon: typeof FileText;
-  tag: string;
-  children: React.ReactNode;
-  dense?: boolean;
-}) {
-  return (
-    <article className={`surface-card rounded-[1.55rem] ${dense ? "p-4" : "p-4 md:p-5"}`}>
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Icon className="h-5 w-5 text-accent-strong" />
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-        </div>
-        <span className="tape-label">{tag}</span>
-      </div>
-      <div className="mt-4">{children}</div>
-    </article>
-  );
-}
-
-// 四类要素的统一空态：虚线边框占位块 + muted 文案。
-// 文案只表述「未提取到」，不暗示「系统确认没有问题」。
-// w-full 必需：关键词面板的外层是 flex flex-wrap，没有它占位块会缩到文字宽度。
-function ElementEmptyState({ message }: { message: string }) {
-  return (
-    <div className="w-full rounded-[1.1rem] border border-dashed border-line/70 bg-white/40 px-4 py-5 text-sm leading-6 text-muted">
-      {message}
-    </div>
-  );
-}
 
 function TextPanel({ title, icon: Icon, content, tag, dense = false }: TextPanelProps) {
   return (
@@ -162,7 +127,11 @@ function EmotionPanel({
                   {getEmotionLevelLabel(signal.level)}
                 </span>
               </div>
-              <p className="mt-2 text-sm leading-6">片段：{signal.excerpt}</p>
+              {/* 受访者原话用引文样式，与下方「建议」形成对照。
+                  去掉「片段：」前缀——竖线本身就是引文信号，blockquote 也给了屏幕阅读器语义。 */}
+              <blockquote className="mt-2 border-l-2 border-line pl-3 text-sm leading-6 text-muted">
+                {signal.excerpt}
+              </blockquote>
               <p className="mt-1 text-sm leading-6">建议：{signal.guidance}</p>
             </div>
           ))
@@ -542,34 +511,55 @@ function RedactionPanel({
   );
 }
 
-function TimelinePanel({
-  events,
-  dense = false,
+// 超过该字数才折叠（严格大于：119 字不出按钮，121 字出按钮）
+const STRUCTURED_COLLAPSE_CHAR_THRESHOLD = 120;
+
+// 必须定义在模块作用域：若写在 StructuredPanel 内部，每次 render 都会生成新的组件类型，
+// 整列表会被卸载重建，展开状态会闪（同下方 RedactionMarkCard 的约定）。
+function StructuredSectionCard({
+  section,
+  index,
 }: {
-  events: ProjectRecord["timelineEvents"];
-  dense?: boolean;
+  section: ProjectRecord["structuredSections"][number];
+  index: number;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const contentId = useId();
+  // 按字数判断，不依赖 DOM 测量
+  const collapsible = section.content.length > STRUCTURED_COLLAPSE_CHAR_THRESHOLD;
+
   return (
-    <SurfaceSection title="要素标引" icon={Sparkles} tag="Timeline" dense={dense}>
-      <div className="grid gap-3">
-        {events.length > 0 ? (
-          events.map((event) => (
-            <div
-              key={event.id}
-              className="rounded-[1.1rem] border border-line/70 bg-white/58 p-4"
-            >
-              <p className="text-xs font-semibold tracking-[0.08em] text-accent-strong">
-                {event.timeLabel}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{event.title}</p>
-              <p className="mt-2 text-sm leading-6 text-muted">{event.description}</p>
-            </div>
-          ))
-        ) : (
-          <ElementEmptyState message="暂未提取到要素标引。转写内容较短或缺少明确时间、事件线索时可能出现，建议对照转写稿人工核对。" />
-        )}
+    <div className="rounded-[1.1rem] border border-line/70 bg-white/58 p-4">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-accent-strong/75">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <p className="min-w-0 wrap-break-word text-sm font-semibold text-foreground">
+          {section.heading}
+        </p>
       </div>
-    </SurfaceSection>
+      {/* 折叠态刻意不加 whitespace-pre-wrap：-webkit-box 与 pre-wrap 组合时换行符处理不稳定，
+          展开态再恢复，保留原文排版。超 120 字的章节基本都是连续散文，这个取舍不影响可读性。 */}
+      <p
+        id={contentId}
+        className={`mt-2 wrap-break-word text-sm leading-6 text-muted ${
+          collapsible && !isExpanded ? "line-clamp-3" : "whitespace-pre-wrap"
+        }`}
+      >
+        {section.content}
+      </p>
+      {collapsible ? (
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={contentId}
+          onClick={() => setIsExpanded((value) => !value)}
+          className="mt-2 rounded-full px-2 py-1 text-xs font-semibold text-accent-strong transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
+        >
+          {isExpanded ? "收起" : "展开全文"}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -580,20 +570,14 @@ function StructuredPanel({
   sections: ProjectRecord["structuredSections"];
   dense?: boolean;
 }) {
+  const meta = sections.length > 0 ? `共 ${sections.length} 节` : null;
+
   return (
-    <SurfaceSection title="结构化档案" icon={FileText} tag="Archive" dense={dense}>
+    <SurfaceSection title="结构化档案" icon={FileText} tag="Archive" meta={meta} dense={dense}>
       <div className="grid gap-3">
         {sections.length > 0 ? (
-          sections.map((section) => (
-            <div
-              key={section.id}
-              className="rounded-[1.1rem] border border-line/70 bg-white/58 p-4"
-            >
-              <p className="text-sm font-semibold text-foreground">{section.heading}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted">
-                {section.content}
-              </p>
-            </div>
+          sections.map((section, index) => (
+            <StructuredSectionCard key={section.id} section={section} index={index} />
           ))
         ) : (
           <ElementEmptyState message="暂无结构化内容。" />
