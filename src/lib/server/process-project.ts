@@ -118,33 +118,36 @@ export async function processProject(projectId: string) {
 
     const transcriptForRedaction = processedTranscription.text || "";
     const aiDraftForRedaction = llmResult.aiDraft || transcriptForRedaction;
-    const redactedTranscript = applyRedactionProfile({
-      text: transcriptForRedaction,
-      level: project.privacyLevel,
-      rules: project.customRedactionRules,
-      sensitiveMarks,
-    });
-    const redactedAiDraft = applyRedactionProfile({
-      text: aiDraftForRedaction,
-      level: project.privacyLevel,
-      rules: project.customRedactionRules,
-      sensitiveMarks,
-    });
 
     // ② summary 此前从不脱敏，却原样进 docx/txt 导出与问答 prompt。
     // prompt 已要求模型不自行脱敏，故这里必须补上后端脱敏，否则原始 PII 会写进导出文件。
-    const redactedSummary = applyRedactionProfile({
-      text: llmResult.summary,
-      level: project.privacyLevel,
-      rules: project.customRedactionRules,
-      sensitiveMarks,
-    });
+    // ③ 四类要素字段（keywords / emotionalSignals / structuredSections / timelineEvents）
+    // 同样从不脱敏，却原样进 docx/txt/json 导出与 ask 路由的 prompt。
+    // ark-llm-provider 的 prompt 明确要求「不要自行脱敏，脱敏由系统在你返回之后统一执行」，
+    // 并逐一点名了这几类字段，这里补上才对得上那句承诺。
+    // 收敛成局部闭包：下面要对十几个短字段各调一次，逐处写完整字面量必然漂移。
+    const redactText = (text: string) =>
+      applyRedactionProfile({
+        text,
+        level: project.privacyLevel,
+        rules: project.customRedactionRules,
+        sensitiveMarks,
+      });
+
+    const redactedTranscript = redactText(transcriptForRedaction);
+    const redactedAiDraft = redactText(aiDraftForRedaction);
+    const redactedSummary = redactText(llmResult.summary);
 
     const processedProject = await updateProject(projectId, (current) => ({
       lastProcessingError: null,
       status: "manual_review",
       summary: redactedSummary,
-      keywords: llmResult.keywords,
+      // 关键词可能整条就是敏感片段（如人名），必须脱敏。
+      // 去重不是可选项：两个不同的人名都会变成 [已脱敏-姓名]，
+      // 重复项会撞关键词面板的 key={keyword}。
+      keywords: Array.from(
+        new Set(llmResult.keywords.map((keyword) => redactText(keyword))),
+      ).filter(Boolean),
       aiDraft: llmResult.aiDraft,
       redactedTranscript,
       redactedAiDraft,
@@ -158,12 +161,19 @@ export async function processProject(projectId: string) {
       emotionalSignals: llmResult.emotionalSignals.map((signal) => ({
         id: nanoid(6),
         ...signal,
+        // 显式字段放 ...signal 之后，脱敏结果不会被模型返回的原文覆盖
+        // （同上方 sensitiveMarks 的处理）。level 是枚举、id 是 nanoid，都不脱敏。
+        label: redactText(signal.label),
+        excerpt: redactText(signal.excerpt),
+        guidance: redactText(signal.guidance),
       })),
       structuredSections:
         llmResult.structuredSections.length > 0
           ? llmResult.structuredSections.map((section) => ({
               id: nanoid(6),
               ...section,
+              heading: redactText(section.heading),
+              content: redactText(section.content),
             }))
           : createFallbackStructuredSections({
               aiDraft: redactedAiDraft,
@@ -176,8 +186,13 @@ export async function processProject(projectId: string) {
           ? llmResult.timelineEvents.map((event) => ({
               id: nanoid(6),
               ...event,
+              timeLabel: redactText(event.timeLabel),
+              title: redactText(event.title),
+              description: redactText(event.description),
             }))
-          : createFallbackTimeline(llmResult.summary),
+          : // 兜底项的 description 就是 summary，必须传脱敏后的，
+            // 否则原始 PII 从这条兜底路径绕回导出文件（结构化档案兜底早已传 redactedSummary）。
+            createFallbackTimeline(redactedSummary),
       workflow: updateWorkflow(current.workflow, {
         transcription: "completed",
         ai_refine: "completed",

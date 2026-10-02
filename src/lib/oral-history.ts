@@ -2,6 +2,7 @@ import type {
   CollectionPath,
   CollectionPlan,
   ConfidentialityLevel,
+  EmotionSignalLevel,
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
@@ -142,6 +143,14 @@ const collectionPathLabelMap: Record<CollectionPath, string> =
     collectionPathOptions.map((option) => [option.value, option.label]),
   ) as Record<CollectionPath, string>;
 
+// 情绪等级没有对应的 *Options 数组（它不是用户可选项，而是模型输出），
+// 故直接写字面量。UI 徽标与 docx/txt 导出共用，避免界面中文、导出英文枚举。
+const emotionLevelLabelMap: Record<EmotionSignalLevel, string> = {
+  notice: "提示",
+  warning: "关注",
+  high: "高度关注",
+};
+
 const scenarioTemplateMap: Record<
   InterviewScenario,
   {
@@ -273,6 +282,12 @@ export function getCollectionPathLabel(value?: CollectionPath) {
 
 export function getRedactionRuleLabel(value: RedactionRule) {
   return redactionLabelMap[value];
+}
+
+// 兜底返回原枚举串：level 类型上是联合，但存量项目里可能出现枚举外的值，
+// 直接返回 undefined 会让导出文件渲染成「（undefined）」。
+export function getEmotionLevelLabel(value: EmotionSignalLevel) {
+  return emotionLevelLabelMap[value] ?? value;
 }
 
 export function buildCollectionPlan(input: {

@@ -18,6 +18,7 @@ import {
   applyRedactionProfile,
   getCollectionPathLabel,
   getConfidentialityLevelLabel,
+  getEmotionLevelLabel,
   getInterviewScenarioDisplayLabel,
   getPrivacyLevelLabel,
   getRedactionRuleLabel,
@@ -355,7 +356,7 @@ async function buildDocx(project: ProjectRecord) {
           payload.emotionalSignals.length > 0
             ? payload.emotionalSignals.map(
                 (signal) =>
-                  `${signal.label}（${signal.level}）\n片段：${signal.excerpt}\n建议：${signal.guidance}`,
+                  `${signal.label}（${getEmotionLevelLabel(signal.level)}）\n片段：${signal.excerpt}\n建议：${signal.guidance}`,
               )
             : ["未识别到需要重点提示的情绪风险片段。"],
         ),
@@ -468,7 +469,7 @@ function buildTxt(project: ProjectRecord) {
     "【情绪提示】",
     ...(payload.emotionalSignals.length > 0
       ? payload.emotionalSignals.flatMap((signal) => [
-          `${signal.label}（${signal.level}）`,
+          `${signal.label}（${getEmotionLevelLabel(signal.level)}）`,
           `片段：${signal.excerpt}`,
           `建议：${signal.guidance}`,
           "",
