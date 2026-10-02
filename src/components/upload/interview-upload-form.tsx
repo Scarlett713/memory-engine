@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AudioLines,
+  ChevronLeft,
   FileText,
   LoaderCircle,
   ShieldCheck,
@@ -12,22 +13,21 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-  OUTLINE_SESSION_STORAGE_KEY,
-  normalizeOutlineSession,
-} from "@/lib/outline-session";
-import {
+  collectionPathOptions,
+  confidentialityLevelOptions,
   interviewScenarioOptions,
   privacyLevelOptions,
   redactionRuleOptions,
 } from "@/lib/oral-history";
 import type {
+  CollectionPath,
+  ConfidentialityLevel,
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
 } from "@/lib/types/project";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
 import { useAuth } from "@/hooks/useAuth";
-import { useDeviceType } from "@/hooks/useDeviceType";
 
 const acceptedAudioExtensions = ".mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,audio/*";
 const defaultRules: RedactionRule[] = [
@@ -47,23 +47,13 @@ const languageOptions = [
   { value: "cn_henanese", label: "河南话" },
 ];
 
-function readStoredOutlineSession() {
-  if (typeof window === "undefined") {
-    return null;
-  }
+type WizardStep = 1 | 2 | 3;
 
-  try {
-    const raw = window.localStorage.getItem(OUTLINE_SESSION_STORAGE_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    return normalizeOutlineSession(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+const wizardSteps: Array<{ step: WizardStep; label: string }> = [
+  { step: 1, label: "基础信息" },
+  { step: 2, label: "采集路径" },
+  { step: 3, label: "音频与提交" },
+];
 
 function ConsentNotice({
   checked,
@@ -105,31 +95,41 @@ function ConsentNotice({
 
 export function InterviewUploadForm() {
   const router = useRouter();
-  const { user, loading } = useAuth();
-  const deviceType = useDeviceType();
+  const { loading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
   const isSubmitting = useProjectWorkspaceStore((state) => state.isSubmitting);
-  const [initialSession] = useState(() => readStoredOutlineSession());
 
+  const [step, setStep] = useState<WizardStep>(1);
+
+  // ── Step 1 基础信息 ──────────────────────────────────────
   const [projectName, setProjectName] = useState("");
   const [intervieweeName, setIntervieweeName] = useState("");
-  const [institutionName, setInstitutionName] = useState("");
-  const [notes, setNotes] = useState(() => initialSession?.profile.notes || "");
-  const [researchFocus, setResearchFocus] = useState(
-    () => initialSession?.profile.researchFocus || "",
-  );
-  const [collectionScenario, setCollectionScenario] = useState<InterviewScenario>(
-    () => initialSession?.profile.collectionScenario || "urban_memory",
-  );
+  const [collectionScenario, setCollectionScenario] =
+    useState<InterviewScenario>("urban_memory");
   const [customScenarioLabel, setCustomScenarioLabel] = useState("");
+  // 标了 ✱ 就必须真的让用户选，所以初值是 null 而不是 "internal"
+  const [confidentialityLevel, setConfidentialityLevel] =
+    useState<ConfidentialityLevel | null>(null);
+  const [notes, setNotes] = useState("");
+  const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState("");
+
+  // ── Step 1 高级设置 ──────────────────────────────────────
+  const [institutionName, setInstitutionName] = useState("");
+  const [researchFocus, setResearchFocus] = useState("");
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>("standard");
   const [customRedactionRules, setCustomRedactionRules] =
     useState<RedactionRule[]>(defaultRules);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [consentChecked, setConsentChecked] = useState(false);
+
+  // ── Step 2 采集路径 ──────────────────────────────────────
+  const [collectionPath, setCollectionPath] = useState<CollectionPath>("upload");
+
+  // ── Step 3 音频与提交 ────────────────────────────────────
   const [language, setLanguage] = useState("cn");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [consentChecked, setConsentChecked] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
 
   const helperText = useMemo(() => {
     if (!audioFile) {
@@ -154,26 +154,69 @@ export function InterviewUploadForm() {
     );
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  function validateStepOne(): string | null {
     if (!projectName.trim()) {
-      setError("请填写口述项目名称。");
-      return;
+      return "请填写口述项目名称。";
     }
 
     if (!intervieweeName.trim()) {
-      setError("请填写受访对象。");
+      return "请填写受访对象姓名。";
+    }
+
+    if (collectionScenario === "custom" && !customScenarioLabel.trim()) {
+      return "选择自定义主题后，请填写具体口述场景。";
+    }
+
+    if (confidentialityLevel === null) {
+      return "请选择保密级别。";
+    }
+
+    return null;
+  }
+
+  function goToStep(next: WizardStep) {
+    setError(null);
+    setStep(next);
+  }
+
+  function goNext() {
+    if (step === 1) {
+      const message = validateStepOne();
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      goToStep(2);
       return;
     }
 
+    if (step === 2) {
+      goToStep(3);
+    }
+  }
+
+  function goBack() {
+    if (step === 1) {
+      return;
+    }
+
+    goToStep(step === 3 ? 2 : 1);
+  }
+
+  async function submitProject() {
     if (!audioFile) {
       setError("请先选择一段受访音频。");
       return;
     }
 
-    if (collectionScenario === "custom" && !customScenarioLabel.trim()) {
-      setError("选择自定义主题后，请填写具体口述场景。");
+    // 回退到 Step 1 让用户补齐；这里的 null 检查同时把类型收窄成 ConfidentialityLevel
+    const stepOneError = validateStepOne();
+
+    if (stepOneError || confidentialityLevel === null) {
+      setError(stepOneError ?? "请选择保密级别。");
+      setStep(1);
       return;
     }
 
@@ -187,11 +230,13 @@ export function InterviewUploadForm() {
         customScenarioLabel:
           collectionScenario === "custom" ? customScenarioLabel.trim() : "",
         notes: notes.trim(),
-        outlineDraftMarkdown: "",
+        outlineDraftMarkdown: outlineDraftMarkdown.trim(),
         projectName: projectName.trim(),
         collectionScenario,
         researchFocus: researchFocus.trim(),
         privacyLevel,
+        confidentialityLevel,
+        collectionPath,
         customRedactionRules,
         language,
       });
@@ -207,445 +252,426 @@ export function InterviewUploadForm() {
     }
   }
 
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-  // ── 个人端极简表单（移动端）──────────────────────────────
-  const [simpleIntervieweeName, setSimpleIntervieweeName] = useState('');
-  const [simpleRelation, setSimpleRelation] = useState('grandparent');
-
-  const relationOptions = [
-    { value: 'grandparent', label: '祖父母 / 外祖父母' },
-    { value: 'parent', label: '父母' },
-    { value: 'spouse', label: '配偶' },
-    { value: 'sibling', label: '兄弟姐妹' },
-    { value: 'friend', label: '朋友 / 邻居' },
-    { value: 'other', label: '其他' },
-  ];
-
-  async function handleSimpleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!simpleIntervieweeName.trim()) {
-      setError('请填写受访者的称呼。');
+    if (step < 3) {
+      goNext();
       return;
     }
-    if (!audioFile) {
-      setError('请先选择一段音频。');
-      return;
-    }
-    try {
-      setError(null);
-      const now = new Date();
-      const yearMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-      const project = await createProject({
-        audioFile,
-        intervieweeName: simpleIntervieweeName.trim(),
-        projectName: `${simpleIntervieweeName.trim()}的口述回忆 · ${yearMonth}`,
-        institutionName: '',
-        collectionScenario: 'family_memory',
-        researchFocus: relationOptions.find(o => o.value === simpleRelation)?.label || '',
-        privacyLevel: 'standard',
-        customRedactionRules: defaultRules,
-        customScenarioLabel: '',
-        notes: '',
-        outlineDraftMarkdown: '',
-        language,
-      });
-      router.push(`/projects/${project.id}?autostart=1`);
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : '上传失败，请稍后重试。'
-      );
-    }
+
+    void submitProject();
   }
 
-  // 认证状态未就绪 → 占位，避免首帧落到完整机构版表单
+  // 认证状态未就绪 → 占位，避免首帧落到完整表单
   if (loading) {
     return (
       <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
         <div className="surface-card rounded-[1.4rem] p-5 text-sm text-muted">
-          正在加载表单...
+          正在加载表单…
         </div>
-      </section>
-    );
-  }
-
-  // 移动端个人用户 → 极简版
-  if (deviceType === 'mobile' && user?.userType === 'personal') {
-    return (
-      <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5">
-        <div className="mb-5">
-          <p className="section-eyebrow">上传音频</p>
-          <h2 className="font-display mt-2 text-2xl font-semibold text-accent-strong">
-            记录这段回忆
-          </h2>
-        </div>
-
-        <form className="soft-scroll space-y-4" onSubmit={handleSimpleSubmit}>
-          <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
-
-          {error && (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
-
-          {/* 受访者称呼 */}
-          <div>
-            <label className="field-label" htmlFor="simpleIntervieweeName">
-              受访者的称呼
-            </label>
-            <input
-              id="simpleIntervieweeName"
-              className="text-field"
-              value={simpleIntervieweeName}
-              onChange={(e) => setSimpleIntervieweeName(e.target.value)}
-              placeholder="例如：外婆、王爷爷"
-              required
-            />
-          </div>
-
-          {/* 与受访者关系 */}
-          <div>
-            <label className="field-label" htmlFor="simpleRelation">
-              TA 和你的关系
-            </label>
-            <select
-              id="simpleRelation"
-              className="text-field"
-              value={simpleRelation}
-              onChange={(e) => setSimpleRelation(e.target.value)}
-            >
-              {relationOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 音频语言 / 方言 */}
-          <div>
-            <label className="field-label" htmlFor="simpleLanguage">
-              音频语言 / 方言
-            </label>
-            <select
-              id="simpleLanguage"
-              className="text-field"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              {languageOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 音频上传区 */}
-          <div>
-            <label className="field-label">上传音频</label>
-            <div
-              className="mt-1 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50 px-4 py-8 text-center"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {audioFile ? (
-                <div className="space-y-1">
-                  <AudioLines className="mx-auto h-6 w-6 text-accent-strong" />
-                  <p className="text-sm font-medium text-stone-700">{audioFile.name}</p>
-                  <p className="text-xs text-stone-400">
-                    {(audioFile.size / 1024 / 1024).toFixed(1)} MB
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <UploadCloud className="mx-auto h-8 w-8 text-stone-300" />
-                  <p className="text-sm text-stone-500">点击选择音频文件</p>
-                  <p className="text-xs text-stone-400">支持 MP3、WAV、M4A 等格式</p>
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={acceptedAudioExtensions}
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting || !consentChecked}
-            className="send-pill w-full justify-center"
-          >
-            {isSubmitting ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-            ) : (
-              <UploadCloud className="h-4 w-4" />
-            )}
-            {isSubmitting ? '上传中…' : '开始整理这段回忆'}
-          </button>
-        </form>
       </section>
     );
   }
 
   return (
     <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="section-eyebrow">Step 02</p>
-          <h2 className="font-display mt-2 text-[1.8rem] font-semibold text-accent-strong md:text-[2.15rem]">
-            {user?.userType === "personal"
-              ? "上传受访音频"
-              : "上传受访音频 · 机构采集"}
-          </h2>
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-sm text-muted">
-          <div className="meta-pill">
-            <AudioLines className="h-4 w-4 text-accent-strong" />
-            本地归档
-          </div>
-          <div className="meta-pill">
-            <ShieldCheck className="h-4 w-4 text-accent-strong" />
-            脱敏规则可配置
-          </div>
-        </div>
-      </div>
-
       <form
-        className="soft-scroll mt-5 space-y-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto"
-        onSubmit={handleSubmit}
+        className="mt-1 flex flex-col gap-4 xl:min-h-0 xl:flex-1"
+        onSubmit={handleFormSubmit}
       >
-        <ConsentNotice checked={consentChecked} onChange={setConsentChecked} />
+        {/* 步骤条：仅支持回退，前进必须走「下一步」校验 */}
+        <ol className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {wizardSteps.map(({ step: stepNumber, label }) => {
+            const isCurrent = step === stepNumber;
+            const isDone = step > stepNumber;
+            const canGoBack = stepNumber < step;
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div className="xl:col-span-2">
-            <label className="field-label" htmlFor="projectName">
-              口述项目名称
-            </label>
-            <input
-              id="projectName"
-              className="text-field"
-              value={projectName}
-              onChange={(event) => setProjectName(event.target.value)}
-              placeholder="例如：上海老城厢口述访谈"
-            />
-          </div>
+            return (
+              <li key={stepNumber} className="min-w-0 sm:flex-1">
+                <button
+                  type="button"
+                  disabled={!canGoBack}
+                  aria-current={isCurrent ? "step" : undefined}
+                  onClick={() => goToStep(stepNumber)}
+                  className={`flex w-full items-center gap-2 rounded-[1rem] border px-3 py-2 text-left text-sm transition-colors ${
+                    isCurrent
+                      ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                      : isDone
+                        ? "border-line/80 bg-white/70 text-foreground"
+                        : "border-line/60 bg-white/40 text-muted"
+                  } ${canGoBack ? "cursor-pointer hover:border-accent-soft" : "cursor-default"}`}
+                >
+                  <span className="text-[11px] font-semibold tracking-[0.18em]">
+                    {String(stepNumber).padStart(2, "0")}
+                  </span>
+                  <span className="truncate font-semibold">{label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
 
-          <div>
-            <label className="field-label" htmlFor="intervieweeName">
-              受访对象
-              <span className="ml-1 text-red-500">*</span>
-            </label>
-            <input
-              id="intervieweeName"
-              className="text-field"
-              value={intervieweeName}
-              onChange={(event) => setIntervieweeName(event.target.value)}
-              placeholder="例如：王阿婆"
-            />
-          </div>
+        <div className="soft-scroll space-y-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto">
+          {step === 1 ? (
+            <>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="xl:col-span-2">
+                  <label className="field-label" htmlFor="projectName">
+                    口述项目名称
+                    <span className="ml-1 text-red-500">*</span>
+                  </label>
+                  <input
+                    id="projectName"
+                    className="text-field"
+                    value={projectName}
+                    onChange={(event) => setProjectName(event.target.value)}
+                    placeholder="例如：上海老城厢口述访谈"
+                  />
+                </div>
 
-          {user?.userType !== "personal" && (
-            <div>
-              <label className="field-label" htmlFor="institutionName">
-                整理机构
-              </label>
-              <input
-                id="institutionName"
-                className="text-field"
-                value={institutionName}
-                onChange={(event) => setInstitutionName(event.target.value)}
-                placeholder="例如：城市口述历史工作站"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="field-label" htmlFor="collectionScenario">
-              口述场景
-            </label>
-            <select
-              id="collectionScenario"
-              className="text-field"
-              value={collectionScenario}
-              onChange={(event) =>
-                setCollectionScenario(event.target.value as InterviewScenario)
-              }
-            >
-              {interviewScenarioOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="language">
-              音频语言 / 方言
-            </label>
-            <select
-              id="language"
-              className="text-field"
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-            >
-              {languageOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="privacyLevel">
-              脱敏级别
-            </label>
-            <select
-              id="privacyLevel"
-              className="text-field"
-              value={privacyLevel}
-              onChange={(event) =>
-                setPrivacyLevel(event.target.value as PrivacyLevel)
-              }
-            >
-              {privacyLevelOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {collectionScenario === "custom" ? (
-            <div className="xl:col-span-2">
-              <label className="field-label" htmlFor="customScenarioLabel">
-                自定义口述主题
-              </label>
-              <input
-                id="customScenarioLabel"
-                className="text-field"
-                value={customScenarioLabel}
-                onChange={(event) => setCustomScenarioLabel(event.target.value)}
-                placeholder="例如：双王街道老城厢生活变迁"
-              />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
-          <div className="space-y-4">
-            <div>
-              <label className="field-label" htmlFor="researchFocus">
-                研究焦点
-              </label>
-              <textarea
-                id="researchFocus"
-                className="text-area min-h-[7rem]"
-                value={researchFocus}
-                onChange={(event) => setResearchFocus(event.target.value)}
-                placeholder="例如：关注街区生活、空间变迁、邻里关系与代际记忆。"
-              />
-            </div>
-
-            <div>
-              <label className="field-label" htmlFor="notes">
-                项目说明
-              </label>
-              <textarea
-                id="notes"
-                className="text-area min-h-[9rem]"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="补充本次口述采集的背景、访谈风格、需要重点照顾的伦理风险等。"
-              />
-            </div>
-
-            <div className="surface-card rounded-[1.55rem] p-4">
-              <div className="flex items-center justify-between gap-3">
                 <div>
+                  <label className="field-label" htmlFor="intervieweeName">
+                    受访对象姓名
+                    <span className="ml-1 text-red-500">*</span>
+                  </label>
+                  <input
+                    id="intervieweeName"
+                    className="text-field"
+                    value={intervieweeName}
+                    onChange={(event) => setIntervieweeName(event.target.value)}
+                    placeholder="例如：王阿婆"
+                  />
+                </div>
+
+                <div>
+                  <label className="field-label" htmlFor="collectionScenario">
+                    采集场景
+                    <span className="ml-1 text-red-500">*</span>
+                  </label>
+                  <select
+                    id="collectionScenario"
+                    className="text-field"
+                    value={collectionScenario}
+                    onChange={(event) =>
+                      setCollectionScenario(
+                        event.target.value as InterviewScenario,
+                      )
+                    }
+                  >
+                    {interviewScenarioOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 自定义主题是 custom 场景的必填项，就地展开而不藏进折叠区，
+                    否则校验错误会被折叠区挡住 */}
+                {collectionScenario === "custom" ? (
+                  <div className="xl:col-span-2">
+                    <label className="field-label" htmlFor="customScenarioLabel">
+                      自定义口述主题
+                      <span className="ml-1 text-red-500">*</span>
+                    </label>
+                    <input
+                      id="customScenarioLabel"
+                      className="text-field"
+                      value={customScenarioLabel}
+                      onChange={(event) =>
+                        setCustomScenarioLabel(event.target.value)
+                      }
+                      placeholder="例如：双王街道老城厢生活变迁"
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="surface-card rounded-[1.55rem] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="section-eyebrow">
+                      保密级别
+                      <span className="ml-1 text-red-500">*</span>
+                    </p>
+                    <h3 className="mt-1.5 text-base font-semibold text-foreground">
+                      档案可见范围
+                    </h3>
+                  </div>
+                  <div className="tape-label">Confidentiality</div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {confidentialityLevelOptions.map((option) => {
+                    const isActive = confidentialityLevel === option.value;
+
+                    return (
+                      <label
+                        key={option.value}
+                        className={`rounded-[1.1rem] border px-4 py-3 text-sm transition-colors ${
+                          isActive
+                            ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                            : "border-line/80 bg-white/55 text-muted"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="confidentialityLevel"
+                          className="sr-only"
+                          checked={isActive}
+                          onChange={() =>
+                            setConfidentialityLevel(option.value)
+                          }
+                        />
+                        <span className="font-semibold">{option.label}</span>
+                        <span className="mt-1.5 block text-xs leading-5">
+                          {option.description}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="notes">
+                  项目说明
+                </label>
+                <textarea
+                  id="notes"
+                  className="text-area min-h-[7rem]"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="补充本次口述采集的背景、访谈风格、需要重点照顾的伦理风险等。"
+                />
+              </div>
+
+              <details className="surface-card rounded-[1.55rem] p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                  访谈提纲（选填）
+                </summary>
+                <p className="mt-2 text-xs leading-5 text-muted">
+                  可粘贴或手写本次访谈提纲，提交后会写入项目档案，并出现在导出的「访谈提纲草稿」一节。
+                </p>
+                <textarea
+                  id="outlineDraftMarkdown"
+                  className="text-area mt-3 min-h-[9rem]"
+                  value={outlineDraftMarkdown}
+                  onChange={(event) =>
+                    setOutlineDraftMarkdown(event.target.value)
+                  }
+                  placeholder="例如：一、童年与家庭；二、迁居经历；三、街区变迁……"
+                />
+              </details>
+
+              <details className="surface-card rounded-[1.55rem] p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                  高级设置（选填）
+                </summary>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="field-label" htmlFor="institutionName">
+                      整理机构
+                    </label>
+                    <input
+                      id="institutionName"
+                      className="text-field"
+                      value={institutionName}
+                      onChange={(event) =>
+                        setInstitutionName(event.target.value)
+                      }
+                      placeholder="例如：城市口述历史工作站"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="privacyLevel">
+                      脱敏级别
+                    </label>
+                    <select
+                      id="privacyLevel"
+                      className="text-field"
+                      value={privacyLevel}
+                      onChange={(event) =>
+                        setPrivacyLevel(event.target.value as PrivacyLevel)
+                      }
+                    >
+                      {privacyLevelOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="field-label" htmlFor="researchFocus">
+                      研究焦点
+                    </label>
+                    <textarea
+                      id="researchFocus"
+                      className="text-area min-h-[7rem]"
+                      value={researchFocus}
+                      onChange={(event) =>
+                        setResearchFocus(event.target.value)
+                      }
+                      placeholder="例如：关注街区生活、空间变迁、邻里关系与代际记忆。"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 border-t border-line/70 pt-4">
                   <p className="section-eyebrow">隐私保护</p>
                   <h3 className="mt-1.5 text-base font-semibold text-foreground">
                     自定义脱敏规则
                   </h3>
-                </div>
-                <div className="tape-label">Privacy</div>
-              </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {redactionRuleOptions.map((option) => {
-                  const isActive = customRedactionRules.includes(option.value);
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {redactionRuleOptions.map((option) => {
+                      const isActive = customRedactionRules.includes(
+                        option.value,
+                      );
 
-                  return (
-                    <label
-                      key={option.value}
-                      className={`rounded-[1.1rem] border px-4 py-3 text-sm transition-colors ${
-                        isActive
-                          ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
-                          : "border-line/80 bg-white/55 text-muted"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={isActive}
-                        onChange={() => toggleRedactionRule(option.value)}
-                      />
-                      {option.label}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="surface-card flex h-full flex-col rounded-[1.55rem] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="section-eyebrow">受访音频</p>
-                  <h3 className="mt-1.5 text-base font-semibold text-foreground">
-                    上传音频材料
-                  </h3>
-                </div>
-                <div className="tape-label">Audio</div>
-              </div>
-
-              <div className="mt-3 flex flex-1">
-                <button
-                  type="button"
-                  className="file-trigger h-full text-left"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[1.15rem] bg-deep text-white shadow-[0_16px_30px_rgba(30,55,55,0.2)]">
-                      {audioFile ? (
-                        <AudioLines className="h-6 w-6" />
-                      ) : (
-                        <UploadCloud className="h-6 w-6" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground md:text-base">
-                        {audioFile ? "更换受访音频" : "选择音频文件"}
-                      </p>
-                      <p className="mt-1.5 text-sm leading-6 text-muted">
-                        {helperText}
-                      </p>
-                    </div>
+                      return (
+                        <label
+                          key={option.value}
+                          className={`rounded-[1.1rem] border px-4 py-3 text-sm transition-colors ${
+                            isActive
+                              ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                              : "border-line/80 bg-white/55 text-muted"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={isActive}
+                            onChange={() => toggleRedactionRule(option.value)}
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })}
                   </div>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="sr-only"
-                  accept={acceptedAudioExtensions}
-                  onChange={handleFileChange}
-                />
-              </div>
-            </div>
+                </div>
+              </details>
+            </>
+          ) : null}
 
-          </div>
+          {step === 2 ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {collectionPathOptions.map((option) => {
+                const isDisabled = option.value === "ai_interview";
+                const isActive = collectionPath === option.value;
+
+                return (
+                  <label
+                    key={option.value}
+                    className={`rounded-[1.4rem] border-2 p-5 transition-colors ${
+                      isDisabled
+                        ? "cursor-not-allowed border-line/60 bg-white/40 text-muted/70"
+                        : isActive
+                          ? "cursor-pointer border-accent-soft bg-accent-soft/70 text-accent-strong"
+                          : "cursor-pointer border-line/80 bg-white/55 text-muted"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="collectionPath"
+                      className="sr-only"
+                      disabled={isDisabled}
+                      checked={isActive}
+                      onChange={() => setCollectionPath(option.value)}
+                    />
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-semibold">{option.label}</span>
+                      {isDisabled ? (
+                        <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-muted">
+                          即将开放
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="mt-2 block text-xs leading-6">
+                      {option.description}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {step === 3 ? (
+            <>
+              <div>
+                <label className="field-label" htmlFor="language">
+                  音频语言 / 方言
+                </label>
+                <select
+                  id="language"
+                  className="text-field"
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                >
+                  {languageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <ConsentNotice
+                checked={consentChecked}
+                onChange={setConsentChecked}
+              />
+
+              <div className="surface-card flex flex-col rounded-[1.55rem] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="section-eyebrow">受访音频</p>
+                    <h3 className="mt-1.5 text-base font-semibold text-foreground">
+                      上传音频材料
+                    </h3>
+                  </div>
+                  <div className="tape-label">Audio</div>
+                </div>
+
+                <div className="mt-3 flex flex-1">
+                  <button
+                    type="button"
+                    className="file-trigger min-h-[10rem] w-full text-left"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-[1.15rem] bg-deep text-white shadow-[0_16px_30px_rgba(30,55,55,0.2)]">
+                        {audioFile ? (
+                          <AudioLines className="h-6 w-6" />
+                        ) : (
+                          <UploadCloud className="h-6 w-6" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground md:text-base">
+                          {audioFile ? "更换受访音频" : "选择音频文件"}
+                        </p>
+                        <p className="mt-1.5 text-sm leading-6 text-muted">
+                          {helperText}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="sr-only"
+                    accept={acceptedAudioExtensions}
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
 
         {error ? (
@@ -656,25 +682,53 @@ export function InterviewUploadForm() {
 
         <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-sm leading-6 text-muted">
-            提交后将直接开始本地音频转写、AI 整理与隐私脱敏处理。
+            {step === 1
+              ? "带 * 的项为必填，完成后进入采集路径选择。"
+              : step === 2
+                ? "本轮仅开放本地上传，AI 访谈即将开放。"
+                : "提交后将直接开始本地音频转写、AI 整理与隐私脱敏处理。"}
           </p>
-          <Button
-            type="submit"
-            className="w-full justify-center sm:w-auto sm:min-w-[220px]"
-            disabled={isSubmitting || !consentChecked}
-          >
-            {isSubmitting ? (
-              <>
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-                上传中…
-              </>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {step > 1 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-center sm:w-auto"
+                onClick={goBack}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                上一步
+              </Button>
+            ) : null}
+
+            {step < 3 ? (
+              <Button
+                type="submit"
+                className="w-full justify-center sm:w-auto sm:min-w-[160px]"
+              >
+                下一步
+              </Button>
             ) : (
-              <>
-                创建项目并开始处理
-                <FileText className="h-4 w-4" />
-              </>
+              <Button
+                type="submit"
+                className="w-full justify-center sm:w-auto sm:min-w-[220px]"
+                disabled={isSubmitting || !consentChecked}
+              >
+                {isSubmitting ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    上传中…
+                  </>
+                ) : (
+                  <>
+                    创建项目并开始处理
+                    <FileText className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </form>
     </section>

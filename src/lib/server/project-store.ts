@@ -6,6 +6,8 @@ import { buildCollectionPlan } from "@/lib/oral-history";
 import { ensureStorageLayout, getProjectsFilePath } from "@/lib/server/storage";
 import {
   createInitialWorkflow,
+  type CollectionPath,
+  type ConfidentialityLevel,
   type InterviewScenario,
   type PrivacyLevel,
   type ProjectRecord,
@@ -32,6 +34,8 @@ type CreateProjectInput = {
   userId: string;
   userType: UserType;
   language?: string;
+  confidentialityLevel?: ConfidentialityLevel;
+  collectionPath?: CollectionPath;
 };
 
 function normalizeWorkflowCopy(
@@ -79,6 +83,8 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
     researchFocus,
     language: project.language || "",
     privacyLevel: project.privacyLevel || "standard",
+    confidentialityLevel: project.confidentialityLevel || "internal",
+    collectionPath: project.collectionPath || "upload",
     customRedactionRules: Array.isArray(project.customRedactionRules)
       ? project.customRedactionRules
       : ["phone", "id_card", "address", "contact_account"],
@@ -207,6 +213,8 @@ export async function createProject(
     researchFocus: input.researchFocus,
     language: input.language,
     privacyLevel: input.privacyLevel,
+    confidentialityLevel: input.confidentialityLevel || "internal",
+    collectionPath: input.collectionPath || "upload",
     customRedactionRules: input.customRedactionRules,
     collectionPlan: buildCollectionPlan({
       scenario: input.collectionScenario,

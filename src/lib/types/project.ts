@@ -41,6 +41,12 @@ export type InterviewScenario =
 
 export type PrivacyLevel = "basic" | "standard" | "strict";
 
+// 档案保密级别：面向归档后的可见范围，与脱敏级别（PrivacyLevel）是两个维度。
+export type ConfidentialityLevel = "public" | "internal" | "confidential";
+
+// 采集路径：本轮仅 upload 可用，ai_interview 预留。
+export type CollectionPath = "upload" | "ai_interview";
+
 export type RedactionRule =
   | "name"
   | "phone"
@@ -135,6 +141,9 @@ export type ProjectRecord = {
   collectionScenario: InterviewScenario;
   researchFocus: string;
   privacyLevel: PrivacyLevel;
+  // 可选：存量项目无此字段，读取时由 normalizeProjectRecord 补默认值
+  confidentialityLevel?: ConfidentialityLevel;
+  collectionPath?: CollectionPath;
   customRedactionRules: RedactionRule[];
   collectionPlan: CollectionPlan;
   summary: string;

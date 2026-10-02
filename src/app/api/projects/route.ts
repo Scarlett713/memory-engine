@@ -7,11 +7,35 @@ import {
 } from "@/lib/server/project-store";
 import { saveInterviewAudio } from "@/lib/server/upload-store";
 import type {
+  CollectionPath,
+  ConfidentialityLevel,
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
   UserType,
 } from "@/lib/types/project";
+
+const confidentialityLevelValues: readonly ConfidentialityLevel[] = [
+  "public",
+  "internal",
+  "confidential",
+];
+
+const collectionPathValues: readonly CollectionPath[] = [
+  "upload",
+  "ai_interview",
+];
+
+// FormData 里的枚举值一律白名单校验，非法值退回 fallback（与 parseCustomRedactionRules 同一防御风格）
+function parseEnumValue<T extends string>(
+  value: FormDataEntryValue | null,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  const raw = typeof value === "string" ? value.trim() : "";
+
+  return allowed.includes(raw as T) ? (raw as T) : fallback;
+}
 
 function parseCustomRedactionRules(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !value.trim()) {
@@ -90,6 +114,16 @@ export async function POST(request: Request) {
       (formData.get("privacyLevel")?.toString().trim() as PrivacyLevel) ||
       "standard";
     const language = formData.get("language")?.toString().trim() ?? "";
+    const confidentialityLevel = parseEnumValue(
+      formData.get("confidentialityLevel"),
+      confidentialityLevelValues,
+      "internal",
+    );
+    const collectionPath = parseEnumValue(
+      formData.get("collectionPath"),
+      collectionPathValues,
+      "upload",
+    );
     const customRedactionRules = parseCustomRedactionRules(
       formData.get("customRedactionRules"),
     );
@@ -137,6 +171,8 @@ export async function POST(request: Request) {
       collectionScenario,
       researchFocus,
       privacyLevel,
+      confidentialityLevel,
+      collectionPath,
       language: language || "cn",
       customRedactionRules,
       userId,

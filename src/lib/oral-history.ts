@@ -1,5 +1,7 @@
 import type {
+  CollectionPath,
   CollectionPlan,
+  ConfidentialityLevel,
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
@@ -79,6 +81,45 @@ export const redactionRuleOptions: Array<{
   { value: "contact_account", label: "邮箱/社交账号" },
 ];
 
+export const confidentialityLevelOptions: Array<{
+  value: ConfidentialityLevel;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "public",
+    label: "公开",
+    description: "成果可用于公开展示、展览或对外传播。",
+  },
+  {
+    value: "internal",
+    label: "内部",
+    description: "仅限机构内部研究使用，不对外发布。默认级别。",
+  },
+  {
+    value: "confidential",
+    label: "机密",
+    description: "含敏感内容，仅授权研究员可调阅，导出需额外审批。",
+  },
+];
+
+export const collectionPathOptions: Array<{
+  value: CollectionPath;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "upload",
+    label: "本地上传",
+    description: "上传已有的音视频文件，进入自动转写与整理流程。",
+  },
+  {
+    value: "ai_interview",
+    label: "AI 访谈",
+    description: "由系统引导完成访谈采集，无需预先录音。",
+  },
+];
+
 const scenarioLabelMap: Record<InterviewScenario, string> = Object.fromEntries(
   interviewScenarioOptions.map((option) => [option.value, option.label]),
 ) as Record<InterviewScenario, string>;
@@ -90,6 +131,16 @@ const privacyLabelMap: Record<PrivacyLevel, string> = Object.fromEntries(
 const redactionLabelMap: Record<RedactionRule, string> = Object.fromEntries(
   redactionRuleOptions.map((option) => [option.value, option.label]),
 ) as Record<RedactionRule, string>;
+
+const confidentialityLabelMap: Record<ConfidentialityLevel, string> =
+  Object.fromEntries(
+    confidentialityLevelOptions.map((option) => [option.value, option.label]),
+  ) as Record<ConfidentialityLevel, string>;
+
+const collectionPathLabelMap: Record<CollectionPath, string> =
+  Object.fromEntries(
+    collectionPathOptions.map((option) => [option.value, option.label]),
+  ) as Record<CollectionPath, string>;
 
 const scenarioTemplateMap: Record<
   InterviewScenario,
@@ -208,6 +259,16 @@ export function getInterviewScenarioDisplayLabel(
 
 export function getPrivacyLevelLabel(value: PrivacyLevel) {
   return privacyLabelMap[value];
+}
+
+// 入参可选：字段类型上是 optional，但 readProjects() 必经 normalizeProjectRecord，
+// 运行时值恒存在，这里再兜一层默认值，调用方就不必写 ?? "internal"。
+export function getConfidentialityLevelLabel(value?: ConfidentialityLevel) {
+  return confidentialityLabelMap[value ?? "internal"];
+}
+
+export function getCollectionPathLabel(value?: CollectionPath) {
+  return collectionPathLabelMap[value ?? "upload"];
 }
 
 export function getRedactionRuleLabel(value: RedactionRule) {

@@ -3,6 +3,7 @@ import { FolderOpen, ShieldCheck, Tags, Workflow } from "lucide-react";
 import { ProjectExportPanel } from "@/components/projects/project-export-panel";
 import { MarkdownSheet } from "@/components/ui/markdown-sheet";
 import {
+  getConfidentialityLevelLabel,
   getInterviewScenarioDisplayLabel,
   getPrivacyLevelLabel,
   getRedactionRuleLabel,
@@ -84,6 +85,12 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             <div>
               <dt className="font-medium text-foreground">研究焦点</dt>
               <dd>{project.researchFocus || "未填写"}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-foreground">保密级别</dt>
+              <dd>
+                {getConfidentialityLevelLabel(project.confidentialityLevel)}
+              </dd>
             </div>
             <div>
               <dt className="font-medium text-foreground">脱敏级别</dt>
