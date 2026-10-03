@@ -94,6 +94,32 @@ function buildOutlineMarkdown(input: LlmOutlineChatInput) {
   ].join("\n");
 }
 
+// 13P1-F 的人为失败开关：mock 下唯一能触发 500 的路径。
+// 仅 LLM_PROVIDER=mock 时可达；#fail 是刻意选的、不会自然出现在修改说明里的串。
+const MOCK_CHAT_FAIL_TOKEN = "#fail";
+
+function findLastUserMessage(input: LlmOutlineChatInput) {
+  return [...input.messages].reverse().find((message) => message.role === "user");
+}
+
+// 单次生成（messages 为空）时逐字返回既有草稿或模板，行为与加对话前完全一致。
+// 对话轮次则把本轮指令落到正文里 —— 否则 mock 下 currentOutline 会被原样退回，
+// 验收用例 13P1-A「markdown 变化」永远不成立。
+function resolveMockOutlineMarkdown(input: LlmOutlineChatInput) {
+  const base = input.currentOutline.trim() || buildOutlineMarkdown(input);
+  const lastUser = findLastUserMessage(input);
+
+  if (!lastUser) {
+    return base;
+  }
+
+  if (lastUser.content.includes(MOCK_CHAT_FAIL_TOKEN)) {
+    throw new Error("mock outline chat failure");
+  }
+
+  return `${base}\n\n## 对话调整记录\n- 按「${lastUser.content}」调整。`;
+}
+
 function getMissingPrompt(input: LlmOutlineChatInput) {
   const profile = normalizeOutlineProfile(input.profile);
 
@@ -194,8 +220,8 @@ export class MockLlmProvider implements LlmProvider {
     input: LlmOutlineChatInput,
   ): Promise<OutlineChatResult> {
     const profile = normalizeOutlineProfile(input.profile);
-    const outlineMarkdown =
-      input.currentOutline.trim() || buildOutlineMarkdown(input);
+    const outlineMarkdown = resolveMockOutlineMarkdown(input);
+    const lastUser = findLastUserMessage(input);
     const readiness =
       profile.projectName && profile.intervieweeName && profile.researchFocus
         ? "ready"
@@ -204,7 +230,9 @@ export class MockLlmProvider implements LlmProvider {
           : "collecting";
 
     return {
-      assistantMessage: getMissingPrompt(input),
+      assistantMessage: lastUser
+        ? `已按你的要求更新提纲：${lastUser.content}`
+        : getMissingPrompt(input),
       outlineMarkdown,
       profile: {
         ...profile,

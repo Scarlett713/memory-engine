@@ -1,9 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, LoaderCircle, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bot,
+  LoaderCircle,
+  NotebookPen,
+  Sparkles,
+} from "lucide-react";
+import { nanoid } from "nanoid";
 
 import { StringListField } from "@/components/outline/string-list-field";
 import { Button } from "@/components/ui/button";
@@ -13,13 +21,24 @@ import {
   OUTLINE_FLAG_PARAM,
   saveOutlineDraftToSession,
 } from "@/lib/outline-session";
+import type { OutlineChatMessage } from "@/lib/types/outline";
 import type { InterviewScenario } from "@/lib/types/project";
+
+const MESSAGE_MAX_LENGTH = 1000;
+// 与 route 的 MESSAGE_HISTORY_LIMIT 对齐：历史只留最近 10 条。
+const MESSAGE_HISTORY_LIMIT = 10;
 
 type OutlineGenerateResponse = {
   markdown?: string;
   error?: string;
   // 老 route 用的是 message 信封，读的时候两个都认。
   message?: string;
+};
+
+type OutlineChatResponse = {
+  markdown?: string;
+  assistantMessage?: string;
+  error?: string;
 };
 
 // LLM 失败时的通用模板。有主题就把主题填进去，没有则留占位符。
@@ -56,9 +75,32 @@ export function OutlinePlanWorkspace() {
   const [notice, setNotice] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // 对话历史只活在页面里：不写 sessionStorage，刷新即丢（本轮约定）。
+  const [messages, setMessages] = useState<OutlineChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatting, setIsChatting] = useState(false);
+
   // 记住上一次生成的原文，用来判断用户是不是手动改过。
   const lastGeneratedRef = useRef("");
-  const canGenerate = Boolean(subject.trim() && topic.trim()) && !isGenerating;
+  const canGenerate =
+    Boolean(subject.trim() && topic.trim()) && !isGenerating && !isChatting;
+  const canChat = Boolean(chatInput.trim()) && !isChatting && !isGenerating;
+
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // 空历史直接 return：生成成功会 setMessages([])，新数组引用照样触发本 effect，
+    // 此时若照滚会把页面硬拽到对话区。
+    if (!messages.length) {
+      return;
+    }
+
+    // block: "nearest" 只滚最近的滚动祖先（那个 max-h-48 容器），不连带滚整页。
+    chatBottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [messages]);
 
   async function handleGenerate() {
     if (!canGenerate) {
@@ -104,17 +146,108 @@ export function OutlinePlanWorkspace() {
         throw new Error(payload?.error ?? payload?.message ?? "生成失败");
       }
 
+      // 提纲真被替换了才清空对话历史（方案 B：随结果清空，不随意图清空）。
+      // 用户取消上面的确认弹窗会 early return，历史完整保留。
       setMarkdown(generated);
+      setMessages([]);
       lastGeneratedRef.current = generated;
       setNotice("");
     } catch {
+      // 这一支不 rethrow，markdown 同样被换成了通用模板，所以一并清历史。
       const fallback = buildFallbackMarkdown(topic);
       setMarkdown(fallback);
+      setMessages([]);
       lastGeneratedRef.current = fallback;
       setNotice("LLM 生成失败，已载入通用模板，可手动调整");
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleChat() {
+    const instruction = chatInput.trim();
+
+    if (!instruction || isChatting || isGenerating) {
+      return;
+    }
+
+    const userMessage: OutlineChatMessage = {
+      id: nanoid(8),
+      role: "user",
+      content: instruction.slice(0, MESSAGE_MAX_LENGTH),
+      createdAt: new Date().toISOString(),
+    };
+    const nextMessages = [...messages, userMessage].slice(
+      -MESSAGE_HISTORY_LIMIT,
+    );
+
+    setIsChatting(true);
+
+    try {
+      const response = await fetch("/api/outline/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          messages: nextMessages,
+          currentOutline: markdown,
+          subject: subject.trim(),
+          topic: topic.trim(),
+          institution: institution.trim(),
+          researchFocus: researchFocus.trim(),
+          collectionScenario,
+          events: events.map((item) => item.trim()).filter(Boolean),
+          timePoints: timePoints.map((item) => item.trim()).filter(Boolean),
+          ethicsNotes: ethicsNotes.trim(),
+        }),
+      });
+
+      const payload = (await response
+        .json()
+        .catch(() => null)) as OutlineChatResponse | null;
+      const nextMarkdown = payload?.markdown?.trim() ?? "";
+
+      if (!response.ok || !nextMarkdown) {
+        throw new Error(payload?.error ?? "修改失败");
+      }
+
+      const assistantMessage: OutlineChatMessage = {
+        id: nanoid(8),
+        role: "assistant",
+        content: payload?.assistantMessage?.trim() || "已按你的要求更新提纲。",
+        createdAt: new Date().toISOString(),
+      };
+
+      // 成功才把这一轮双方一起落进历史：失败时不写 user，重发不会产生重复轮次，
+      // 聊天区也不会留下没被回答的孤儿提问。
+      setMessages(
+        [...nextMessages, assistantMessage].slice(-MESSAGE_HISTORY_LIMIT),
+      );
+      setMarkdown(nextMarkdown);
+      // 对话也算模型产物：否则下一轮「生成」会误判成用户手动改过而弹覆盖确认。
+      lastGeneratedRef.current = nextMarkdown;
+      setChatInput("");
+      setNotice("");
+    } catch {
+      // markdown 与 messages 都不动，chatInput 保留方便直接重发。
+      setNotice("提纲修改失败，请稍后重试或手动编辑");
+    } finally {
+      setIsChatting(false);
+    }
+  }
+
+  function handleChatKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    // 中文输入法按回车是确认候选词，isComposing 为 true，不能当成发送。
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    void handleChat();
   }
 
   function handleConfirm() {
@@ -365,6 +498,96 @@ export function OutlinePlanWorkspace() {
                 {isGenerating ? "正在生成提纲…" : "填写左侧信息后点击生成"}
               </div>
             )}
+
+            {markdown ? (
+              <div className="surface-card flex flex-col gap-3 rounded-[1.55rem] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="section-eyebrow">多轮对话细化</p>
+                  {messages.length ? (
+                    <span className="text-xs text-muted">
+                      {messages.length} 条记录
+                    </span>
+                  ) : null}
+                </div>
+
+                {messages.length ? (
+                  <div className="soft-scroll flex max-h-48 flex-col gap-3 overflow-y-auto pr-1">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`chat-row ${
+                          message.role === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`chat-bubble ${
+                            message.role === "user"
+                              ? "chat-bubble-user"
+                              : "chat-bubble-assistant"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.12em] opacity-80">
+                            {message.role === "assistant" ? (
+                              <>
+                                <Bot className="h-3.5 w-3.5" />
+                                提纲助手
+                              </>
+                            ) : (
+                              <>
+                                <NotebookPen className="h-3.5 w-3.5" />
+                                研究者
+                              </>
+                            )}
+                          </div>
+                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
+                            {message.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div ref={chatBottomRef} />
+                  </div>
+                ) : (
+                  <p className="text-sm leading-6 text-muted">
+                    生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
+                  </p>
+                )}
+
+                <textarea
+                  className="text-area min-h-22"
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  disabled={isChatting || isGenerating}
+                  maxLength={MESSAGE_MAX_LENGTH}
+                  placeholder="例如：把开场问题改得更生活化"
+                  aria-label="提纲修改说明"
+                />
+
+                <div className="flex items-center justify-end">
+                  <Button
+                    type="button"
+                    onClick={() => void handleChat()}
+                    disabled={!canChat}
+                    className="w-full sm:w-auto"
+                  >
+                    {isChatting ? (
+                      <>
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        修改中…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        发送修改
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
               <Button
