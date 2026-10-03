@@ -24,8 +24,9 @@ type UseScrollRestorationOptions = {
   // 只有 pathname 匹配时才允许写入。客户端跳转改掉 URL 之后立刻停止持久化，
   // 免得 Next 自己的回顶把存档刷成 0。
   persistPath?: string;
-  // 「内容已落定」信号：为 false 表示列表正在重新拉取。只在 window 分支当门控用，
-  // 在两个分支里都作为「内容到货后重跑一次」的触发器。
+  // 「内容已落定」信号：为 false 表示列表正在重新拉取。两个分支都不拿它当门控 ——
+  // 返回首页时 fetchProjects 会立刻把 isLoading 翻成 true，门控会把恢复推迟到请求结束。
+  // 现在只在恢复 A 里当「内容到货后重跑一次」的触发器。
   ready?: boolean;
 };
 
@@ -224,22 +225,48 @@ export function useScrollRestoration(
     );
   }, [elementRef, storageKey, ready]);
 
-  // 恢复 B：目标是 window → 必须用被动的 useEffect。React 的 layout 阶段子先父后，
-  // 用 useLayoutEffect 会跑在 layout-router 里祖先组件写 documentElement.scrollTop = 0
-  // 之前而被反超。被动 effect 在整个 layout 阶段之后落地，push 与 popstate 都能覆盖。
-  useEffect(() => {
-    if (!ready) return;
+  // 恢复 B：目标是 window。
+  //
+  // 这里不能用 layout 阶段直接写：Next 在 layout-router 的 componentDidUpdate 里写
+  // documentElement.scrollTop = 0，而 React 的 layout 阶段子先父后，我们会被反超。
+  // 也不能用被动 useEffect：它由 Scheduler 调度，不保证在 paint 之前跑完 —— 慢网实测
+  // 会漏出一帧停在顶部（375px + 800ms 延迟稳定复现）。
+  //
+  // 微任务正好落在两者之间：本次 commit 的同步栈全部跑完（Next 的反超写入已完成）之后、
+  // 浏览器 paint 之前。所以「layout 阶段把第一次恢复排进微任务」既躲开反超，又赶在
+  // paint 前落位。实测同一场景顶部停留帧 1 → 0。
+  //
+  // 不拿 ready 做门控、也不进依赖数组（理由同恢复 A）。返回首页时 HomeDashboard 的 mount
+  // effect 会立刻调 fetchProjects 把 isLoading 翻成 true，这一下会在**同一个任务内**触发
+  // 重渲染，于是本 effect 的 cleanup 抢在微任务出队之前跑掉、把排好的恢复取消 —— 实测
+  // popstate 返回时恢复一次都没执行。内容迟到靠 startScrollRestore 的 rAF 重试兜，
+  // 不需要 ready 触发重跑。
+  useIsomorphicLayoutEffect(() => {
     if (isScrollable(elementRef.current)) return;
 
     const saved = savedOffsetRef.current ?? readSavedOffset(storageKey);
 
+    // 存档为 0 或没有存档：不排微任务，什么也不做，天然没有可闪的东西。
     if (saved === null || saved <= 0) return;
 
-    return startScrollRestore(
-      elementRef,
-      saved,
-      isRestoringRef,
-      cancelRestoreRef,
-    );
-  }, [elementRef, storageKey, ready]);
+    let cancelled = false;
+    let stop: (() => void) | null = null;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      stop = startScrollRestore(
+        elementRef,
+        saved,
+        isRestoringRef,
+        cancelRestoreRef,
+      );
+    });
+
+    return () => {
+      // 卸载可能发生在微任务出队之前，此时 stop 还是 null，靠 cancelled 拦住尚未启动的恢复。
+      cancelled = true;
+      stop?.();
+    };
+  }, [elementRef, storageKey]);
 }
