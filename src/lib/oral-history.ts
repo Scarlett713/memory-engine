@@ -10,6 +10,7 @@ import type {
   StructuredSection,
   TimelineEvent,
 } from "@/lib/types/project";
+import { sensitiveMarkTypeLabel } from "@/lib/types/project";
 
 export const interviewScenarioOptions: Array<{
   value: InterviewScenario;
@@ -493,7 +494,8 @@ export function applyRedactionProfile(input: {
   );
 
   for (const mark of sortedMarks) {
-    const fallbackLabel = mark.type.trim() || "敏感信息";
+    // 存量旧数据的 type 可能不在枚举内（如 institution），运行时兜底到通用标签。
+    const fallbackLabel = sensitiveMarkTypeLabel[mark.type] ?? "敏感信息";
     nextText = replaceAllSafe(nextText, mark.excerpt, `[已脱敏-${fallbackLabel}]`);
   }
 

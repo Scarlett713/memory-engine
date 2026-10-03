@@ -35,6 +35,7 @@ import {
 } from "@/lib/oral-history";
 import {
   countPendingSensitiveMarks,
+  sensitiveMarkTypeLabel,
   type CollectionPath,
   type EmotionSignal,
   type ProjectRecord,
@@ -336,7 +337,9 @@ function RedactionMarkCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-foreground">{mark.type}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {sensitiveMarkTypeLabel[mark.type] ?? mark.type}
+          </p>
           {needsAttention ? (
             <span className="rounded-full border border-warning/30 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-warning">
               【待人工核实】

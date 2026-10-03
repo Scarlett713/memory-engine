@@ -2,6 +2,7 @@ import type {
   InterviewScenario,
   PrivacyLevel,
   RedactionRule,
+  SensitiveMarkType,
 } from "@/lib/types/project";
 import type {
   OutlineChatMessage,
@@ -19,7 +20,7 @@ export type LlmRefineInput = {
 };
 
 export type LlmSensitiveMark = {
-  type: string;
+  type: SensitiveMarkType;
   excerpt: string;
   reason: string;
   // 归一化后的类型，normalizeSensitiveMarks 保证该字段存在（模型没返回时落 false）

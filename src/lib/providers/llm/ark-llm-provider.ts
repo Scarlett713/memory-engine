@@ -10,6 +10,10 @@ import type {
   LlmStructuredSection,
   LlmTimelineEvent,
 } from "@/lib/providers/llm/types";
+import {
+  sensitiveMarkTypes,
+  type SensitiveMarkType,
+} from "@/lib/types/project";
 import type { OutlineChatResult } from "@/lib/types/outline";
 
 function getRequiredEnv(name: string) {
@@ -75,6 +79,32 @@ function normalizeStringArray(value: unknown, limit = 8) {
     .slice(0, limit);
 }
 
+const sensitiveMarkTypeSet = new Set<string>(sensitiveMarkTypes);
+
+// 模型可能返回约定枚举值、旧词表英文拼写（institution / personal_name …）
+// 或中文自由文本，统一归到枚举；无法识别落 "other"。
+// 注意：白名单必须放在正则之前——中文正则匹配不了 "name"，
+// 否则所有合法枚举值都会被判成 "other"。
+export function normalizeMarkType(raw: unknown): SensitiveMarkType {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (!s) return "other";
+  if (sensitiveMarkTypeSet.has(s)) return s as SensitiveMarkType;
+
+  // 旧词表 / 英文别名
+  if (/personal_?name/.test(s)) return "name";
+  if (/personal_(history|experience)/.test(s)) return "other";
+  if (/institution/.test(s)) return "organization";
+
+  // 中文自由文本
+  if (/姓名|称谓|名字|人名/.test(s)) return "name";
+  if (/电话|手机|联系方式/.test(s)) return "phone";
+  if (/身份证/.test(s)) return "id_card";
+  if (/地址|住址/.test(s)) return "address";
+  if (/单位|机构|组织|学校/.test(s)) return "organization";
+  if (/邮箱|账号|社交/.test(s)) return "contact_account";
+  return "other";
+}
+
 function normalizeSensitiveMarks(value: unknown): LlmSensitiveMark[] {
   if (!Array.isArray(value)) {
     return [];
@@ -87,14 +117,14 @@ function normalizeSensitiveMarks(value: unknown): LlmSensitiveMark[] {
       }
 
       const mark = item as Record<string, unknown>;
-      const type = typeof mark.type === "string" ? mark.type.trim() : "";
+      const type = normalizeMarkType(mark.type);
       const excerpt =
         typeof mark.excerpt === "string" ? mark.excerpt.trim() : "";
       const reason = typeof mark.reason === "string" ? mark.reason.trim() : "";
       // 严格等值判断：字段缺失、null、字符串 "true" 一律落 false
       const needsVerify = mark.needsVerify === true;
 
-      if (!type || !excerpt) {
+      if (!excerpt) {
         return null;
       }
 
@@ -275,7 +305,12 @@ export class ArkLlmProvider implements LlmProvider {
         keywords: [""],
         redactionNotes: [""],
         sensitiveMarks: [
-          { type: "", excerpt: "", reason: "", needsVerify: false },
+          {
+            type: "name | phone | id_card | address | organization | contact_account | other",
+            excerpt: "",
+            reason: "",
+            needsVerify: false,
+          },
         ],
         emotionalSignals: [
           { label: "", level: "notice", excerpt: "", guidance: "" },
@@ -290,7 +325,7 @@ export class ArkLlmProvider implements LlmProvider {
       "4. summary should be concise and accurate, and follows the same no-redaction rule as aiDraft.",
       "5. keywords should contain 3 to 6 topical terms.",
       "6. emotionalSignals should identify emotional fluctuation, trauma cues, or safety-sensitive passages.",
-      "7. 标记私人敏感信息：普通个人姓名、联系方式、家庭住址、私人身份信息。以下不标记：政府机关、公共机构、知名企业、公开地名、以公共身份被提及的历史人物和公众人物。同名私人、单位内部非公开部门、非公开个人经历细节仍须标记。无法确定是否公开时仍输出标记但带 needsVerify: true。AI 不自行决定跳过。",
+      "7. 标记私人敏感信息：普通个人姓名、联系方式、家庭住址、私人身份信息。以下不标记：政府机关、公共机构、知名企业、公开地名、以公共身份被提及的历史人物和公众人物。同名私人、单位内部非公开部门、非公开个人经历细节仍须标记。无法确定是否公开时仍输出标记但带 needsVerify: true。AI 不自行决定跳过。type 字段必须是以下值之一：name / phone / id_card / address / organization / contact_account / other，不得输出其他字符串。",
       "8. structuredSections should organize the transcript into academic/archive-friendly sections.",
       "9. timelineEvents should extract key events or life stages in chronological form when possible.",
       "Transcript:",

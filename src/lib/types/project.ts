@@ -66,9 +66,32 @@ export type SensitiveMarkStatus = "pending" | "confirmed" | "revoked";
 // source 为后续「规则命中项也进审校列表」预留；本轮只有 'ai' 有写入方。
 export type SensitiveMarkSource = "ai" | "custom_rule";
 
+// 敏感信息类型受控枚举。数组是为归一化提供运行时白名单，别再手写第二份。
+export const sensitiveMarkTypes = [
+  "name",
+  "phone",
+  "id_card",
+  "address",
+  "organization",
+  "contact_account",
+  "other",
+] as const;
+
+export type SensitiveMarkType = (typeof sensitiveMarkTypes)[number];
+
+export const sensitiveMarkTypeLabel: Record<SensitiveMarkType, string> = {
+  name: "姓名",
+  phone: "联系电话",
+  id_card: "身份证号",
+  address: "住址",
+  organization: "机构/单位",
+  contact_account: "邮箱/账号",
+  other: "敏感信息",
+};
+
 export type SensitiveMark = {
   id: string;
-  type: string;
+  type: SensitiveMarkType;
   excerpt: string;
   reason: string;
   // 审校状态：revoked 的标记不再参与脱敏
