@@ -15,6 +15,7 @@ import { nanoid } from "nanoid";
 
 import { StringListField } from "@/components/outline/string-list-field";
 import { Button } from "@/components/ui/button";
+import { MarkdownSheet } from "@/components/ui/markdown-sheet";
 import { interviewScenarioOptions } from "@/lib/oral-history";
 import {
   OUTLINE_FLAG_PARAM,
@@ -79,6 +80,8 @@ export function OutlinePlanWorkspace() {
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
   const [isEnteringInterview, setIsEnteringInterview] = useState(false);
+  // 提纲默认给渲染后的样子；要动手改再切回编辑。
+  const [isPreviewMode, setIsPreviewMode] = useState(true);
 
   // 记住上一次生成的原文，用来判断用户是不是手动改过。
   const lastGeneratedRef = useRef("");
@@ -552,12 +555,41 @@ export function OutlinePlanWorkspace() {
             ) : null}
 
             {markdown ? (
-              <textarea
-                className="text-area min-h-[24rem] flex-1"
-                value={markdown}
-                onChange={(event) => setMarkdown(event.target.value)}
-                aria-label="访谈提纲草稿"
-              />
+              <>
+                {/* 切换 tab 只在有提纲时出现 —— 空态露出来会指向不存在的可切换内容。 */}
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant={isPreviewMode ? "secondary" : "ghost"}
+                    className="min-h-9 px-4 py-1.5"
+                    onClick={() => setIsPreviewMode(true)}
+                  >
+                    预览
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isPreviewMode ? "ghost" : "secondary"}
+                    className="min-h-9 px-4 py-1.5"
+                    onClick={() => setIsPreviewMode(false)}
+                  >
+                    编辑
+                  </Button>
+                </div>
+
+                {/* 两种模式共用同一块最小高度，切换时面板不跳。 */}
+                {isPreviewMode ? (
+                  <div className="soft-scroll min-h-[24rem] flex-1 overflow-auto rounded-[1.1rem] border border-line/60 bg-white/60 p-4">
+                    <MarkdownSheet markdown={markdown} />
+                  </div>
+                ) : (
+                  <textarea
+                    className="text-area min-h-[24rem] flex-1"
+                    value={markdown}
+                    onChange={(event) => setMarkdown(event.target.value)}
+                    aria-label="访谈提纲草稿"
+                  />
+                )}
+              </>
             ) : (
               <div className="surface-card flex min-h-[24rem] flex-1 items-center justify-center rounded-[1.55rem] px-4 py-4 text-sm leading-6 text-muted">
                 {isGenerating ? "正在生成提纲…" : "填写左侧信息后点击生成"}
