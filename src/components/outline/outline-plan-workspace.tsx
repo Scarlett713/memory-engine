@@ -17,7 +17,6 @@ import { StringListField } from "@/components/outline/string-list-field";
 import { Button } from "@/components/ui/button";
 import { interviewScenarioOptions } from "@/lib/oral-history";
 import {
-  clearOutlineDraftFromSession,
   OUTLINE_FLAG_PARAM,
   saveOutlineDraftToSession,
 } from "@/lib/outline-session";
@@ -107,9 +106,15 @@ export function OutlinePlanWorkspace() {
       return;
     }
 
-    if (markdown.trim() && markdown !== lastGeneratedRef.current) {
+    // 第二个条件是给对话历史留的：handleChat 成功时会把 lastGeneratedRef 同步成新 markdown，
+    // 所以「对话改过」在第一个条件看来等于「没改过」。但重新生成会清空对话历史，
+    // 不能一声不吭地把多轮记录丢掉，必须也走一次确认。
+    if (
+      markdown.trim() &&
+      (markdown !== lastGeneratedRef.current || messages.length > 0)
+    ) {
       const confirmed = window.confirm(
-        "重新生成将覆盖当前已编辑的提纲，确定继续？",
+        "重新生成将覆盖当前提纲并清空对话记录，确定继续？",
       );
 
       if (!confirmed) {
@@ -267,8 +272,17 @@ export function OutlinePlanWorkspace() {
   }
 
   function handleSkip() {
-    clearOutlineDraftFromSession();
-    router.push("/upload");
+    // 提纲留空，但画像字段照带 —— 用户跳过的是提纲，不是刚填的资料。
+    // 标记位不能省：上传页在没有 outline=1 时会清掉这份草稿。
+    saveOutlineDraftToSession("", {
+      projectName: topic.trim(),
+      intervieweeName: subject.trim(),
+      institutionName: institution.trim(),
+      collectionScenario,
+      researchFocus: researchFocus.trim(),
+      notes: ethicsNotes.trim(),
+    });
+    router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
   }
 
   const scenarioHint =
