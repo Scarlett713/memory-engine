@@ -17,6 +17,7 @@ export type LlmRefineInput = {
   researchFocus: string;
   privacyLevel: PrivacyLevel;
   customRedactionRules: RedactionRule[];
+  writingRules?: string; // REQ-14 §6.3：整理链路注入的写作规则（未传则不追加）
 };
 
 export type LlmSensitiveMark = {

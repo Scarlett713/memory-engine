@@ -328,6 +328,7 @@ export class ArkLlmProvider implements LlmProvider {
       "7. 标记私人敏感信息：普通个人姓名、联系方式、家庭住址、私人身份信息。以下不标记：政府机关、公共机构、知名企业、公开地名、以公共身份被提及的历史人物和公众人物。同名私人、单位内部非公开部门、非公开个人经历细节仍须标记。无法确定是否公开时仍输出标记但带 needsVerify: true。AI 不自行决定跳过。type 字段必须是以下值之一：name / phone / id_card / address / organization / contact_account / other，不得输出其他字符串。",
       "8. structuredSections should organize the transcript into academic/archive-friendly sections.",
       "9. timelineEvents should extract key events or life stages in chronological form when possible.",
+      ...(input.writingRules ? [input.writingRules] : []),
       "Transcript:",
       input.transcript,
     ].join("\n");

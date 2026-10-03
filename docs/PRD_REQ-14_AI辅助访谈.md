@@ -1,8 +1,8 @@
 # REQ-14 PRD：AI 辅助访谈（AI 主访 + 实时侧写）
 
-- 版本：v1.3
+- 版本：v1.4
 - 编制日期：2026-10-03
-- 版本变更：v1.1（交互方式待确认、情绪提示口径修正）→ v1.2（D2=A AI 主访已选定；PRD 正文待按方案 A 改稿）→ **v1.3（2026-10-03 正文按 D2=A 重写：AI 逐问与追问、情绪暂停恢复、写作规则插槽；302→307 措辞修正）**
+- 版本变更：v1.1（交互方式待确认、情绪提示口径修正）→ v1.2（D2=A AI 主访已选定；PRD 正文待按方案 A 改稿）→ **v1.3（2026-10-03 正文按 D2=A 重写：AI 逐问与追问、情绪暂停恢复、写作规则插槽；302→307 措辞修正）** → **v1.4（2026-10-03：两份 prompt 模板落盘 `src/lib/writing-rules.ts` / `src/lib/interview-prompt.ts`；§11.5.1 最小解冻 1 行插槽；§9-H 一票否决本期口径；§13 新增 2 项待确认）**
 - 语言：中文（工程导向）
 - 关联：REQ-13（提纲生成与对话细化，已实现）、REQ-11、REQ-15（草稿箱，候选）、REQ-16（首页与新建流程重构，候选）、REQ-17（后台编辑管理入口，候选）、REQ-18（脱敏规则体系，候选）、REQ-19（用户反馈通道 / 稿件返修，候选）、REQ-20（成文稿导出 PDF，候选）、UI-07（处理台情绪提示定位修正）
 - **交互方式：D2=A AI 主访（AI 直接主访受访者）—— 任 2026-10-03 确认，方案 A「✅ 已选定」（见 §0.1）**；接受文本模型（deepseek-v4-flash）单轮 3-10s 延迟，**中期不要求实时语音模型**。本稿正文（§1 ~ §9）已按方案 A（AI 主访）重写（v1.3，2026-10-03）；方案 B 仅作历史记录（见 §0.1）。
@@ -362,6 +362,17 @@ if (!token) {
 25. 原「音频上传」链路（`/upload`）与 REQ-13 提纲预填、`?outline=1` 草稿带入**全部回归通过**。
 26. `tmp/cdp-req13-outline.mjs`（含 13-E 首页两入口断言）、`tmp/cdp-req13-crosscut.mjs`、`tmp/measure-375.mjs`（375px header 高度基线）**全部保持通过**（因首页与上传页未改动）。
 
+### H. 一票否决项的本期口径（05 交付文本标准）
+
+05《最终交付文本标准与文本内容测试标准》的 4 条一票否决项，**本期只验第 1 条与第 4 条**，另 2 条本期不可达、不验（原因见下）：
+
+| # | 一票否决项 | 本期口径 |
+| --- | --- | --- |
+| 1 | 事实零错误 | **验**：`tmp/verify/verify-req14-prompts.ts` 第 7 组断言锁定 Prompt B 的「只按转写原文陈述」「禁止修正、只能标记」「事实存疑标【待人工核实】」 |
+| 2 | 模板章节完整率 100% | 不验（本期不可达）：依赖导出侧按 07 模板渲染章节，而导出 API 本期零改动（§11.5）；整理侧已按 D8 在 Prompt B 落「aiDraft 按模板五章组织」 |
+| 3 | 共用要素齐全率 100% | 不验（本期不可达）：07 元信息 12 项属导出封面职责，见 §13 待确认项 9 |
+| 4 | 脱敏合规 | **验**：Prompt B「严格遵守「严禁自行脱敏」，只标记、不替换、不删除」与 `ark-llm-provider.ts` 既有 requirement 1 同口径（断言比对两份源码） |
+
 ## 10. 不做边界（本期明确不做）
 
 - 视频采集（D4=A 仅音频）。
@@ -405,6 +416,8 @@ if (!token) {
 | `src/lib/interview-signals.ts` | 规则情绪提示 + 本地侧写兜底 + 触发频控（纯函数） |
 | `src/lib/types/interview.ts` | 侧写 / checklist 类型（**新建文件，不动 `types/project.ts`**） |
 | `src/lib/server/enum.ts` | `parseEnumValue` + 允许值常量（hardening 共享） |
+| `src/lib/writing-rules.ts` | 写作规则收敛（03 语言规范 + 05 内容标准 + 07 五类模板）：`WRITING_RULES_TEMPLATE`、`OUTLINE_WRITING_TEMPLATES`、`resolveWritingTemplate`、`buildWritingRules`（纯函数，含 `OUTPUT_GRADE`） |
+| `src/lib/interview-prompt.ts` | AI 提问 prompt 构建与出参容错：`buildInterviewQuestionPrompt`、`parseInterviewQuestionOutput`（含 `followUpCount>=2` 硬强制）、`INTERVIEW_QUESTION_TIMEOUT_MS = 15_000` |
 
 ### 11.3 新增（API）
 
@@ -424,7 +437,20 @@ if (!token) {
 
 ### 11.5 明确不修改
 
-`src/lib/types/project.ts`、`src/lib/server/project-store.ts`、`src/lib/server/upload-store.ts`、`src/lib/server/storage.ts`、`src/lib/server/process-project.ts`、`src/app/api/projects/[projectId]/export/route.ts`、`src/lib/providers/llm/*`、`src/lib/providers/transcription/*`、`src/components/home/home-dashboard.tsx`、`src/components/upload/interview-upload-form.tsx`。
+`src/lib/server/project-store.ts`、`src/lib/server/upload-store.ts`、`src/lib/server/storage.ts`、`src/app/api/projects/[projectId]/export/route.ts`、`src/lib/providers/transcription/*`、`src/components/home/home-dashboard.tsx`、`src/components/upload/interview-upload-form.tsx`。
+
+### 11.5.1 最小解冻（仅 1 行插槽，已落地 2026-10-03）
+
+原「明确不修改」中的三个文件因**写作规则注入**（§6.3 / D6）各解冻 1 处，除此之外零改动：
+
+| 文件 | 改动（逐字） | 依据 |
+| --- | --- | --- |
+| `src/lib/providers/llm/types.ts` | `LlmRefineInput` 增加 `writingRules?: string;`（+1 行） | §6.3 注入口 |
+| `src/lib/providers/llm/ark-llm-provider.ts` | `refineTranscript` 的 prompt 数组在 `"Transcript:"` 之前插入 `...(input.writingRules ? [input.writingRules] : []),`（+1 行；未传时既有 prompt 逐字不变） | §6.3 |
+| `src/lib/server/process-project.ts` | 新增 `import { buildWritingRulesForProject } from "@/lib/writing-rules";`；`refineTranscript({...})` 入参增加 `writingRules: buildWritingRulesForProject(project),`（+2 行） | §6.3 / D6 |
+
+> 已核验（2026-10-03）：`git diff --numstat` 分别为 `1/0`、`1/0`、`2/0`（纯新增、零删除）；`writingRules` 未传时整理 prompt 与现状逐字一致（既有 9 条 requirement 不变）。
+> 说明：本次解冻只动 provider 的输入契约（`LlmRefineInput.writingRules`）；**未触碰 §0 第 2 条「不改数据层」**：`ProjectRecord` / `project-store.ts` / `storage.ts` 零改动（`types/project.ts` 仅被读取类型，未被修改）。
 
 > 说明：上传页 Step 2 的「AI 访谈」卡片是硬编码 `disabled`（`interview-upload-form.tsx:662`），且该表单提交链路强制要求音频文件（`src/app/api/projects/route.ts:151-156`）。本期**保持 disabled 与「即将开放」文案不变**，AI 访谈入口唯一在提纲工作台；上传页与首页的入口重构统一交给 REQ-16。
 
@@ -437,6 +463,7 @@ if (!token) {
 | `tmp/verify/verify-interview-signals.ts` | 规则引擎分级、去重冷却、频控与熔断 |
 | `tmp/verify/verify-outline-parser.ts` | 提纲解析（空 / 超长 / 异常 markdown） |
 | `tmp/verify/verify-proxy-api.ts` | proxy：`/api/*` 401 vs 页面 307 |
+| `tmp/verify/verify-req14-prompts.ts` | 两份 prompt 模板 7 组断言：枚举覆盖 / 模板逐字（07 docx 直读）/ 零占位符 / 体积与切片 / JSON 容错 / 追问上限 / 脱敏口径（116 条断言全绿） |
 | `tmp/cdp-req14-interview.mjs` | 控制台端到端（stub SpeechRecognition / 录音，断言状态机、sidecar 调用、结束 → 上传 → 跳处理台） |
 
 ## 12. 关键实现参数速查
@@ -468,3 +495,5 @@ if (!token) {
 5. REQ-14 入口唯一在提纲工作台；首页与上传页不动，等 REQ-16 统一重构。
 6. REQ-16 与 REQ-14 的排期顺序：本 PRD 假设 REQ-14 先行、REQ-16 后续重构入口。
 7. **v1.3 新增待确认项**：① 写作规则文档最终清单（§6.3 列出的 3 个 docx 是否全用、禁用词表是否单独成表）；② 情绪暂停的形态（已按 §3 模块 4 复用 `paused` 态实现，是否需要独立暂停页）；③ 同一题连续追问上限 2 次是否需要可配置。
+8. ~~**写作规则文档最终清单**~~ —— **✅ 已定稿（2026-10-03）**：03（语言规范）+ 05（内容标准）+ 07（5 类模板章节骨架）三份全用，落盘为 `src/lib/writing-rules.ts`（`WRITING_RULES_TEMPLATE` + `OUTLINE_WRITING_TEMPLATES`）；05 的「禁用词表」并入【语言规范】节、不单独成表；同一题追问上限**固定 2 次、不做配置**（`MAX_FOLLOW_UP_COUNT = 2`，路由侧硬强制）。
+9. **07 元信息 12 项（共用要素齐全率）本期不可达**：07 模板的元信息 12 项属**导出封面**职责，导出 API 本期零改动（§11.5），故 05 的「共用要素齐全率 100%」本期不验；建议随 **UI-07** 统一处理导出侧模板渲染（含 §9-H 第 2、3 条）。

@@ -11,6 +11,7 @@ import { getLlmProvider } from "@/lib/providers/llm";
 import { getTranscriptionProvider } from "@/lib/providers/transcription";
 import { getProjectById, updateProject } from "@/lib/server/project-store";
 import { postProcessTranscriptionResult } from "@/lib/server/transcript-postprocess";
+import { buildWritingRulesForProject } from "@/lib/writing-rules";
 import type {
   ProjectRecord,
   SensitiveMark,
@@ -89,6 +90,7 @@ export async function processProject(projectId: string) {
       researchFocus: project.researchFocus,
       privacyLevel: project.privacyLevel,
       customRedactionRules: project.customRedactionRules,
+      writingRules: buildWritingRulesForProject(project),
     });
 
     // 显式字段放在 ...mark 之后：即便模型越权返回 status/source 也不会覆盖
