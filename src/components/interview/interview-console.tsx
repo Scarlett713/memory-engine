@@ -50,8 +50,8 @@ import type { ProjectRecord } from "@/lib/types/project";
  * | CLEAR_SNAPSHOT        | ready                                       | 不变，只清横幅            |
  *
  * PAUSE / RESUME 除改 phase 外，还会连带调用 useSpeechRecorder 的
- * pause() / resume()（停止识别与音频写入、冻结计时）；FINISH 与「结束回答」
- * 会连带 stop()，否则暂停或结束后麦克风仍在录。
+ * pause() / resume()（停止识别与音频写入、冻结计时）；FINISH 会连带 stop()，
+ * 否则结束后麦克风仍在录。
  *
  * START 落到 ai_thinking 而不是直接 ai_asking：PRD §3 模块 3 要「读取提纲 →
  * 生成当前问题」，首问同样是异步的。
@@ -69,6 +69,12 @@ import type { ProjectRecord } from "@/lib/types/project";
  * 区分 manual / emotion）与崩溃恢复（进度快照写 localStorage，key =
  * `interview_progress_{projectId}`，超 24h 或形状不合法即丢弃；是否恢复到
  * ready 横幅由用户点选，RESTORE 不会把回答态原样回放——录音器跨不过刷新）。
+ *
+ * Step 6：上传录音。整个访谈只开一次 MediaRecorder——「结束回答」由 stop() 改成
+ * pause()（stop 会把 chunksRef 清空并封口，此后拿到的只有最后一段），唯一一次
+ * stop 在 FINISH 之前发生，产出的单个 Blob 交给 .../interview/audio 归档；落盘
+ * 成功后跳处理台并带 autostart=1，由既有的 /process 路由接手转写与整理。
+ * 全程没录到音频（拒了麦克风权限）时静默跳过上传，跳转也不带 autostart。
  */
 
 export type InterviewPhase =
@@ -188,7 +194,6 @@ const FINISHABLE_PHASES: readonly InterviewPhase[] = [
  * 这类浅层词不列入，避免正常吐槽被当成情绪危机。
  */
 const EMOTION_KEYWORDS: readonly string[] = [
-  "Mock",   // ← 临时改，验完改回
   "不想说了",
   "说不下去",
   "太难了",
@@ -232,8 +237,15 @@ const SNAPSHOT_SKIP_PHASES: readonly InterviewPhase[] = [
 
 const OUTLINE_PREVIEW_COUNT = 3;
 
-/** ⚠️ Step 6 之前的上传占位：真实上传接口接好后随占位块一起删除。 */
-const UPLOAD_PLACEHOLDER_MS = 900;
+/**
+ * Step 6：等 onstop 交出 Blob 的上限。
+ *
+ * MediaRecorder 的 onstop 是独立的浏览器任务，而暂停弹窗的「结束并保存」在同一个
+ * tick 里就 stop() + dispatch(FINISH)，上传 effect 先跑时 blob 往往还没到。只在
+ * 该录音器确实启动过时才等（见 recorderAliveRef），没录音的会话不会白等这两秒。
+ */
+const BLOB_WAIT_TIMEOUT_MS = 2000;
+const BLOB_POLL_INTERVAL_MS = 50;
 
 /**
  * Step 3：真实解析器落在 interview-outline-checklist.tsx（PRD §3 模块 7）。
@@ -277,6 +289,38 @@ function formatDuration(durationMs: number): string {
   const seconds = totalSeconds % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/**
+ * 有界轮询等 onWavReady 写入 Blob。
+ *
+ * 不能用 durationMs 判断「用户到底录没录」：它由 1s 间隔的计时器驱动，只录了半秒的
+ * 会话读出来仍是 0，那会把一次真实上传误判成「没录音」而静默跳过。改由调用方传
+ * recorderAliveRef——它记录「本次会话开过录音器」，与计时器的分辨率无关。
+ */
+async function waitForBlob(
+  blobRef: { current: Blob | null },
+  recorderAliveRef: { current: boolean },
+) {
+  if (blobRef.current || !recorderAliveRef.current) {
+    return blobRef.current;
+  }
+
+  const deadline = Date.now() + BLOB_WAIT_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    await sleep(BLOB_POLL_INTERVAL_MS);
+
+    if (blobRef.current) {
+      return blobRef.current;
+    }
+  }
+
+  return null;
 }
 
 function interviewReducer(
@@ -487,6 +531,15 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
   // Step 6 上传用。Blob 不可序列化，不进 reducer。
   const wavBlobRef = useRef<Blob | null>(null);
+  // 本次会话是否开过录音器（一旦为真就不再回落）。用来区分「录了、在等 onstop」
+  // 与「从头到尾没录到（拒了权限）」，后者要静默跳过上传而不是白等 2 秒。
+  const recorderAliveRef = useRef(false);
+  // 同一次 uploading 只发一次请求：StrictMode 会把 effect 跑两遍，依赖抖动也会重跑。
+  // 离开 uploading 相位即复位，这样 FAIL → RETRY 回到 uploading 时能重新发。
+  const uploadStartedRef = useRef(false);
+  // 本轮因没录到音频而跳过上传 → done 跳转不带 autostart，免得处理台对着空
+  // audioStoragePath 自动开跑然后报「未找到音频文件」。
+  const uploadSkippedRef = useRef(false);
 
   // Step 5：崩溃恢复的存储键。约定 key = `interview_progress_${projectId}`。
   const storageKey = `interview_progress_${project.id}`;
@@ -516,6 +569,13 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
       wavBlobRef.current = blob;
     },
   });
+
+  // 录音器启动过就置位，之后不再回落：上传时要靠它判断「值不值得等 onstop」。
+  useEffect(() => {
+    if (isRecording) {
+      recorderAliveRef.current = true;
+    }
+  }, [isRecording]);
 
   // captions 末尾没有换行，临时字幕直拼会粘成「你好我在说」。
   const captionText =
@@ -552,7 +612,14 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
     } catch {
       // 删不掉也只是残留一份快照，TTL 会兜底，不值得中断流程。
     }
-    router.push(`/projects/${project.id}`);
+    // Step 6：归档成功才带 autostart=1，让处理台接手转写与整理；本会话没录到音频
+    // （拒了麦克风权限）时 uploadSkippedRef 为真，直接回项目页，不触发一次注定
+    // 失败的自动整理。不在这里 router.refresh()：同 tick 刷新会打断这次跳转。
+    router.push(
+      uploadSkippedRef.current
+        ? `/projects/${project.id}`
+        : `/projects/${project.id}?autostart=1`,
+    );
   }, [phase, project.id, router, storageKey]);
 
   // Step 5：崩溃恢复（读）。只登记，不直接改 phase。无值 / 解析失败 / 过期 /
@@ -630,7 +697,12 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        resumeRecording();
+        // 只在「暂停前正在回答」时续录：从 ai_asking 进暂停时录音器是活着但已暂停
+        // 的状态（Step 6 全程一个录音），无条件 resume 会让麦克风在 AI 提问期间
+        // 就开始收数据。守卫读的是 resumedPhase（暂停前的相位），不是当前相位。
+        if (state.resumedPhase === "user_answering") {
+          resumeRecording();
+        }
         dispatch({ type: "RESUME" });
       }
     }
@@ -641,7 +713,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [phase, resumeRecording]);
+  }, [phase, resumeRecording, state.resumedPhase]);
 
   // Step 5：情绪关键词命中 → 自动暂停。本题只触发一次：命中即置位，此后 RESUME
   // 回 user_answering（captions 未变、仍含关键词）也不会立刻再次暂停。
@@ -738,6 +810,9 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
       if (data.done) {
         // 提纲聊完，直接进上传。FINISHABLE_PHASES 含 ai_thinking，成立。
+        // 先 stop()：全程一个录音下，「结束回答」只 pause，唯一一次 stop 才是产出
+        // Blob 的地方，不 stop 就永远等不到 onWavReady。
+        stopRecording();
         dispatch({ type: "FINISH" });
         return;
       }
@@ -760,6 +835,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
     state.followUpCount,
     state.coveredItemIds,
     state.captions,
+    stopRecording,
   ]);
 
   // 不加取消守卫：迟到的回包是安全的——AI_QUESTION_READY 在 reducer 里有 phase
@@ -772,19 +848,71 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
     void fetchNextQuestion();
   }, [phase, fetchNextQuestion]);
 
-  // ⚠️ Step 6 占位：uploading 应改为 await POST /api/projects/{id}/interview/audio。
+  // Step 6：归档上传。multipart 字段名沿用 /api/projects 的 audio；filename 决定
+  // audioFileName，转写 provider 按扩展名认格式，所以即便 upload-store 会把文件落成
+  // .audio，这里也必须给出真实的 .webm / .ogg。
+  const uploadAudio = useCallback(
+    async (blob: Blob) => {
+      const extension = blob.type.includes("ogg") ? "ogg" : "webm";
+      const formData = new FormData();
+      // set 而非 append：仓库唯一的 FormData 生产端（store/project-workspace.ts）
+      // 全用 set，文件字段也一样。不设 Content-Type，boundary 交给浏览器。
+      formData.set("audio", blob, `${project.id}-interview.${extension}`);
+
+      const res = await fetch(`/api/projects/${project.id}/interview/audio`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        // 路由的失败信封是 { message }，取出来直接显示给用户。
+        const payload = (await res.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+
+        throw new Error(payload?.message ?? "录音上传失败，请重试。");
+      }
+    },
+    [project.id],
+  );
+
+  // Step 6：真实上传，替换掉原来的 900ms 占位定时器。
   useEffect(() => {
     if (phase !== "uploading") {
-      return undefined;
+      // 离开上传态即复位：FAIL → RETRY 会回到 uploading，那一次要重新发。
+      uploadStartedRef.current = false;
+      return;
     }
 
-    const timer = window.setTimeout(
-      () => dispatch({ type: "UPLOAD_DONE" }),
-      UPLOAD_PLACEHOLDER_MS,
-    );
+    // StrictMode 的双调用与依赖抖动都靠它挡掉，否则会存出两个音频文件。
+    if (uploadStartedRef.current) {
+      return;
+    }
 
-    return () => window.clearTimeout(timer);
-  }, [phase]);
+    uploadStartedRef.current = true;
+
+    void (async () => {
+      try {
+        const blob = await waitForBlob(wavBlobRef, recorderAliveRef);
+
+        if (!blob) {
+          // 全程没录到音频，没有文件可传：静默跳过，不把用户卡在错误态。
+          uploadSkippedRef.current = true;
+          dispatch({ type: "UPLOAD_DONE" });
+          return;
+        }
+
+        await uploadAudio(blob);
+        dispatch({ type: "UPLOAD_DONE" });
+      } catch (error) {
+        dispatch({
+          type: "FAIL",
+          message:
+            error instanceof Error ? error.message : "录音上传失败，请重试。",
+        });
+      }
+    })();
+  }, [phase, uploadAudio]);
 
   if (phase === "done") {
     // 不渲染，跳转由上面的 effect 负责。
@@ -924,8 +1052,16 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   type="button"
                   variant="primary"
                   onClick={async () => {
+                    // 全程一个录音：首问是 start，之后每一问都是 resume。必须分支——
+                    // hook 的 start() 在 isRecordingRef 为真时静默 return，而 pause()
+                    // 不会把它置假，所以录音器只要活着（哪怕处于暂停）就只能走 resume()，
+                    // 否则从第二问起麦克风再也不收数据。
                     // 权限被拒也进 user_answering，横幅会说明原因。
-                    await startRecording();
+                    if (isRecording) {
+                      resumeRecording();
+                    } else {
+                      await startRecording();
+                    }
                     dispatch({ type: "USER_START_ANSWERING" });
                   }}
                 >
@@ -976,7 +1112,10 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   type="button"
                   variant="primary"
                   onClick={() => {
-                    stopRecording();
+                    // 只暂停，不停：本访谈要产出单个音频文件，stop() 会把 chunksRef
+                    // 清空并封口，此后每答一问就只能拿到最后那一段。真正的 stop 只
+                    // 发生在 FINISH 之前（见上传 effect 与 fetchNextQuestion 的 done 分支）。
+                    pauseRecording();
                     dispatch({ type: "USER_DONE_SPEAKING" });
                   }}
                 >
@@ -1022,7 +1161,9 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
           {phase === "uploading" ? (
             <>
               <CenteredLoading>正在上传录音…</CenteredLoading>
-              {/* Step 4: 上传 interview-{projectId}.wav 并显示真实进度。 */}
+              <p className="text-center text-sm leading-7 text-muted">
+                上传完成后将自动开始整理，请勿关闭页面。
+              </p>
             </>
           ) : null}
 
@@ -1073,7 +1214,10 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   type="button"
                   variant="primary"
                   onClick={() => {
-                    resumeRecording();
+                    // 同 Esc 处：只有暂停前正在回答才续录，AI 提问期间的暂停不恢复麦克风。
+                    if (state.resumedPhase === "user_answering") {
+                      resumeRecording();
+                    }
                     dispatch({ type: "RESUME" });
                   }}
                 >
@@ -1084,7 +1228,9 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   type="button"
                   variant="secondary"
                   onClick={() => {
-                    // 先收尾录音再走上传：否则麦克风会一直开着。
+                    // 收尾录音：全程一个录音下，这里是产出 Blob 的两处之一（另一处是
+                    // fetchNextQuestion 的 done 分支）。不 stop 麦克风会一直开着，
+                    // 也永远等不到 onWavReady。
                     stopRecording();
                     dispatch({ type: "FINISH" });
                   }}
