@@ -71,14 +71,97 @@ type TextPanelProps = {
   content: string;
   tag: string;
   dense?: boolean;
+  // 只有「脱敏整理稿」开这个开关：它可能长到把首屏占满。口述摘要复用同一个组件但不开，
+  // 保持不限高。默认 false 即老行为。
+  clampBody?: boolean;
 };
 
-function TextPanel({ title, icon: Icon, content, tag, dense = false }: TextPanelProps) {
+// 超过该字数才折叠（严格大于：280 字不出按钮，281 字出按钮）。
+// 同 STRUCTURED_COLLAPSE_CHAR_THRESHOLD 的约定：按字数判断，不依赖 DOM 测量。
+const DRAFT_CLAMP_CHAR_THRESHOLD = 280;
+
+// 折叠态用固定高度裁切，不用 line-clamp：见下方 StructuredSectionCard 的注释，
+// -webkit-box 与 whitespace-pre-wrap 组合时换行符处理不稳定。这里保留原文排版优先。
+const DRAFT_CLAMP_CLASS = "max-h-[17.5rem] overflow-hidden";
+
+function TextPanel({
+  title,
+  icon: Icon,
+  content,
+  tag,
+  dense = false,
+  clampBody = false,
+}: TextPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  // 必须用 useId 而非硬编码 id：内联实例（hidden xl:block，仍在 DOM 里）
+  // 与弹层实例可能同时存在，硬编码会让 aria-controls 指向重复 id。
+  const contentId = useId();
+
+  const clamped = clampBody && content.length > DRAFT_CLAMP_CHAR_THRESHOLD;
+
   return (
     <SurfaceSection title={title} icon={Icon} tag={tag} dense={dense}>
-      <div className="whitespace-pre-wrap text-sm leading-7 text-muted">
+      <div
+        id={contentId}
+        className={`whitespace-pre-wrap wrap-break-word text-sm leading-7 text-muted ${
+          clamped && !isExpanded ? DRAFT_CLAMP_CLASS : ""
+        }`}
+      >
         {content || "暂无内容"}
       </div>
+      {clamped ? (
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={contentId}
+          onClick={() => setIsExpanded((value) => !value)}
+          className="mt-2 rounded-full px-2 py-1 text-xs font-semibold text-accent-strong transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
+        >
+          {isExpanded ? "收起" : "展开全文"}
+        </button>
+      ) : null}
+    </SurfaceSection>
+  );
+}
+
+// 转写稿说明文案：默认收起时提示这是什么、去哪儿看整理稿。
+const TRANSCRIPT_HINT = "讯飞原始转写，供与整理稿对照；默认收起";
+const TRANSCRIPT_EMPTY_HINT = "暂无转写稿";
+// 展开态在卡内滚动，不把页面撑长（用户痛点是滚动层数太多，不是怕滚动）。
+const TRANSCRIPT_BODY_CLASS =
+  "soft-scroll mt-3 max-h-[20rem] overflow-y-auto overflow-x-hidden pr-1 whitespace-pre-wrap wrap-break-word text-sm leading-7 text-muted";
+
+// 原始转写稿收纳卡：整卡全宽摆在结果栅格最后一行，默认只露标题 + 说明 + 展开按钮。
+// 必须定义在模块作用域：写在 ResultGrid 内部会每次 render 生成新组件类型，展开状态会闪
+// （同 StructuredSectionCard 的约定）。
+function TranscriptPanel({ content, dense = false }: { content: string; dense?: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const bodyId = useId();
+
+  const empty = content.trim().length === 0;
+  const expanded = !empty && isExpanded;
+
+  return (
+    <SurfaceSection title="原始转写稿（对照用）" icon={FileText} tag="Raw" dense={dense}>
+      <p className="text-sm leading-6 text-muted">
+        {empty ? TRANSCRIPT_EMPTY_HINT : TRANSCRIPT_HINT}
+      </p>
+      {/* 容器恒定渲染、正文按需挂载：aria-controls 始终指向存在的节点，
+          折叠时也不把整篇转写稿留在 DOM 里（内联与弹层两份实例会翻倍）。 */}
+      <div id={bodyId}>
+        {expanded ? <div className={TRANSCRIPT_BODY_CLASS}>{content}</div> : null}
+      </div>
+      {empty ? null : (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          onClick={() => setIsExpanded((value) => !value)}
+          className="mt-3 w-full rounded-[0.9rem] border border-line/50 bg-white/55 px-3 py-2 text-center text-xs font-semibold text-accent-strong transition-colors hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
+        >
+          {expanded ? "收起" : "展开对照"}
+        </button>
+      )}
     </SurfaceSection>
   );
 }
@@ -604,26 +687,21 @@ function ResultGrid({
     : null;
 
   return (
-    <div className="grid gap-4">
-      <div className={`grid gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
-        <div className="grid gap-4">
-          <TextPanel
-            title="自动转写稿"
-            icon={FileText}
-            content={project.transcriptRaw}
-            tag="Raw"
-            dense={expanded}
-          />
+    <div className="grid w-full min-w-0 gap-4">
+      <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
+        {/* self-start：左列只剩一张限高卡，不让它被右列高度拉成一张空白大卡 */}
+        <div className="grid min-w-0 self-start gap-4">
           <TextPanel
             title="脱敏整理稿"
             icon={Sparkles}
             content={project.redactedAiDraft || project.aiDraft}
             tag="Redacted"
             dense={expanded}
+            clampBody
           />
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <TextPanel
             title="口述摘要"
             icon={ScanText}
@@ -647,10 +725,13 @@ function ResultGrid({
         </div>
       </div>
 
-      <div className={`grid gap-4 ${expanded ? "2xl:grid-cols-[0.9fr_1.1fr]" : "xl:grid-cols-[0.92fr_1.08fr]"}`}>
+      <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[0.9fr_1.1fr]" : "xl:grid-cols-[0.92fr_1.08fr]"}`}>
         <TimelinePanel events={project.timelineEvents} dense={expanded} />
         <StructuredPanel sections={project.structuredSections} dense={expanded} />
       </div>
+
+      {/* 第三行全宽：转写稿只是对照用，默认收起，不占首屏 */}
+      <TranscriptPanel content={project.transcriptRaw} dense={expanded} />
     </div>
   );
 }
@@ -966,17 +1047,7 @@ export function ProjectProcessingConsole({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {hasResults ? (
-              <Button
-                type="button"
-                variant="secondary"
-                className="hidden min-w-[138px] xl:inline-flex"
-                onClick={() => setIsExpanded(true)}
-              >
-                <Maximize2 className="h-4 w-4" />
-                放大查看
-              </Button>
-            ) : null}
+            {/* xl 及以上不再有「放大查看」入口：结果栅格已内联在下方，弹层只会多一层滚动 */}
             <Button onClick={handleRegenerateClick} disabled={isBusy}>
               {isBusy ? (
                 <>
@@ -1016,8 +1087,14 @@ export function ProjectProcessingConsole({
                   <p className="text-sm font-semibold text-foreground">
                     AI 整理已完成 · 请确认审校结果
                   </p>
+                  {/* xl 结果栅格就在下方，不需要弹层；<xl 才有「打开整理结果」这个动作 */}
                   <p className="mt-1 text-sm leading-6 text-muted">
-                    查看下方整理结果，有需要可放大修改；确认无误后点击「完成审校」解锁导出。
+                    <span className="hidden xl:inline">
+                      查看下方整理结果，确认无误后点击「完成审校」解锁导出。
+                    </span>
+                    <span className="xl:hidden">
+                      点击下方打开整理结果进行复核，确认无误后点击「完成审校」解锁导出。
+                    </span>
                   </p>
                   {confirmError && (
                     <p className="mt-2 text-xs text-red-500">{confirmError}</p>
@@ -1026,10 +1103,10 @@ export function ProjectProcessingConsole({
                     <button
                       type="button"
                       onClick={() => setIsExpanded(true)}
-                      className="inline-flex items-center gap-2 rounded-full bg-white/70 border border-line/60 px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-white"
+                      className="xl:hidden inline-flex items-center gap-2 rounded-full bg-white/70 border border-line/60 px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-white"
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
-                      放大查看 / 修改
+                      查看整理结果
                     </button>
                     <button
                       type="button"
@@ -1170,9 +1247,8 @@ export function ProjectProcessingConsole({
             <div className="paper-panel paper-panel-strong flex min-h-0 flex-1 flex-col rounded-[2rem] px-4 py-4 md:px-6 md:py-5">
               <div className="flex flex-col gap-3 border-b border-line/60 pb-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="section-eyebrow">Expanded View</p>
-                  <h3 className="font-display mt-2 text-[1.8rem] font-semibold text-accent-strong">
-                    整理结果全屏查看
+                  <h3 className="font-display text-[1.8rem] font-semibold text-accent-strong">
+                    整理结果
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-muted">
                     更适合通读长文本；按 <span className="font-semibold text-accent-strong">Esc</span> 也可以关闭。
@@ -1212,12 +1288,15 @@ export function ProjectProcessingConsole({
                     onClick={() => setIsExpanded(false)}
                   >
                     <X className="h-4 w-4" />
-                    退出放大
+                    关闭
                   </Button>
                 </div>
               </div>
 
-              <div className="soft-scroll mt-4 min-h-0 flex-1 overflow-auto pr-1">
+              {/* 只在这一层裁横向：宽度由 min-w-0 交给栅格，纵向照常滚动。
+                  用长写 overflow-y/x 而非 overflow-auto + overflow-x-hidden，
+                  避免简写属性按生成顺序把 overflow-x 覆盖回 auto。 */}
+              <div className="soft-scroll mt-4 min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
                 <ResultGrid project={currentProject} expanded review={reviewController} />
               </div>
             </div>

@@ -23,13 +23,18 @@ export function SurfaceSection({
   children: ReactNode;
   dense?: boolean;
 }) {
+  // article 上的 min-w-0：卡片常作为 grid item（两列栅格 / 单列堆叠），
+  // 没有它长内容会把整列顶宽，窄屏直接横向溢出。
   return (
-    <article className={`surface-card rounded-[1.55rem] ${dense ? "p-4" : "p-4 md:p-5"}`}>
+    <article className={`surface-card min-w-0 rounded-[1.55rem] ${dense ? "p-4" : "p-4 md:p-5"}`}>
       <div className="flex items-center justify-between gap-4">
         {/* min-w-0 让 meta 在窄屏下能换行，不把右侧 tag 挤出容器 */}
         <div className="flex min-w-0 items-center gap-3">
           <Icon className="h-5 w-5 shrink-0 text-accent-strong" />
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+          {/* 标题允许换行 + 长串断词；右侧 tag 靠 shrink-0 保持完整，不参与压缩 */}
+          <h3 className="min-w-0 wrap-break-word text-base font-semibold text-foreground">
+            {title}
+          </h3>
           {meta ? <span className="text-xs font-medium text-muted">{meta}</span> : null}
         </div>
         <span className="tape-label shrink-0">{tag}</span>
