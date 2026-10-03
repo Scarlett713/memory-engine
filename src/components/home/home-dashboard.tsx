@@ -42,28 +42,37 @@ export function HomeDashboard() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:min-w-[420px] xl:justify-end">
-              {user ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 sm:justify-start">
-                  <div className="min-w-0">
-                    <p
-                      className="truncate text-xs font-medium text-stone-700"
-                      title={user.email}
+              {/* 徽标槽位的固定占位。useAuth 的 user 是组件内 state，客户端跳转回首页时
+                  组件重新挂载 —— user 先是 null（徽标不渲染），/api/auth/me 到货后才插进来，
+                  header 被撑高，下方列表跟着下跳。375px 下这一列的堆叠高度直接决定 header
+                  高度：徽标 47px + 外层 gap-3 的 12px = 59px，就是跳变量。
+                  min-h 取 47（徽标的实测高度）而非 59：有徽标时 max(47, 47) 不生长，
+                  375px 的 header 保持原高；≥640px 槽位已被 CTA 撑到 54px，47 ≤ 54 同样
+                  不生长。全断点中性，只补上没有徽标时的空缺。 */}
+              <div className="min-h-[47px]">
+                {user ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 sm:justify-start">
+                    <div className="min-w-0">
+                      <p
+                        className="truncate text-xs font-medium text-stone-700"
+                        title={user.email}
+                      >
+                        {user.email}
+                      </p>
+                      <p className="text-[10px] text-stone-400">
+                        {user.userType === "personal" ? "个人版" : "机构版"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="ml-2 shrink-0 text-[11px] text-stone-400 transition-colors hover:text-red-500"
                     >
-                      {user.email}
-                    </p>
-                    <p className="text-[10px] text-stone-400">
-                      {user.userType === "personal" ? "个人版" : "机构版"}
-                    </p>
+                      退出
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={logout}
-                    className="ml-2 shrink-0 text-[11px] text-stone-400 transition-colors hover:text-red-500"
-                  >
-                    退出
-                  </button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
 
               <Link href="/upload" className="sidebar-cta w-full px-5 sm:w-auto">
                 <Plus className="h-4 w-4" />
