@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import {
   clearOutlineDraftFromSession,
   OUTLINE_FLAG_PARAM,
-  readOutlineDraftFromSession,
+  readOutlineDraftSession,
 } from "@/lib/outline-session";
 import {
   collectionPathOptions,
@@ -32,6 +32,7 @@ import {
   privacyLevelOptions,
   redactionRuleOptions,
 } from "@/lib/oral-history";
+import type { StoredOutlineSession } from "@/lib/types/outline";
 import type {
   CollectionPath,
   ConfidentialityLevel,
@@ -60,14 +61,14 @@ const languageOptions = [
   { value: "cn_henanese", label: "河南话" },
 ];
 
-// 只在带标记位时读 sessionStorage。没有标记位一律返回空，
+// 只在带标记位时读 sessionStorage。没有标记位一律返回 null，
 // 保证直接进 /upload 不会被上一次的提纲串味。
-function readInitialOutlineDraft(hasOutlineFlag: boolean) {
+function readInitialOutlineDraft(hasOutlineFlag: boolean): StoredOutlineSession | null {
   if (!hasOutlineFlag || typeof window === "undefined") {
-    return "";
+    return null;
   }
 
-  return readOutlineDraftFromSession();
+  return readOutlineDraftSession();
 }
 
 type WizardStep = 1 | 2 | 3;
@@ -124,22 +125,43 @@ export function InterviewUploadForm() {
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
   const isSubmitting = useProjectWorkspaceStore((state) => state.isSubmitting);
 
+  // 提纲草稿由 /projects/new/outline 带来：URL 只带 ?outline=1 标记位，提纲全文与画像都在 sessionStorage。
+  // 读取放在惰性初始化里而不是 effect 里 —— 同步 setState 的 effect 会触发级联渲染（lint 会报）。
+  // 这个子树不会 SSR：useSearchParams 让它在最近的 Suspense 边界内退化成客户端渲染，
+  // 所以首帧就能拿到草稿；typeof window 守卫只是防它以后变成动态渲染。
+  // 只读一次、六个字段都从它派生 —— 之前 markdown 和展开态各读了一次 sessionStorage。
+  const hasOutlineFlag = searchParams.get(OUTLINE_FLAG_PARAM) === "1";
+  const [prefill] = useState(() => readInitialOutlineDraft(hasOutlineFlag));
+
   const [step, setStep] = useState<WizardStep>(1);
 
   // ── Step 1 基础信息 ──────────────────────────────────────
-  const [projectName, setProjectName] = useState("");
-  const [intervieweeName, setIntervieweeName] = useState("");
+  const [projectName, setProjectName] = useState(
+    () => prefill?.profile.projectName ?? "",
+  );
+  const [intervieweeName, setIntervieweeName] = useState(
+    () => prefill?.profile.intervieweeName ?? "",
+  );
   const [collectionScenario, setCollectionScenario] =
-    useState<InterviewScenario>("urban_memory");
+    useState<InterviewScenario>(
+      // normalizer 已经做过白名单，这里拿到的必定是合法枚举。
+      () => prefill?.profile.collectionScenario ?? "urban_memory",
+    );
+  // profile 里没有「自定义场景名」，所以提纲页选了 custom 的话这里补不了，
+  // 由 Step 1 的校验提示用户填 —— 属预期行为。
   const [customScenarioLabel, setCustomScenarioLabel] = useState("");
   // 标了 ✱ 就必须真的让用户选，所以初值是 null 而不是 "internal"
   const [confidentialityLevel, setConfidentialityLevel] =
     useState<ConfidentialityLevel | null>(null);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(() => prefill?.profile.notes ?? "");
 
   // ── Step 1 高级设置 ──────────────────────────────────────
-  const [institutionName, setInstitutionName] = useState("");
-  const [researchFocus, setResearchFocus] = useState("");
+  const [institutionName, setInstitutionName] = useState(
+    () => prefill?.profile.institutionName ?? "",
+  );
+  const [researchFocus, setResearchFocus] = useState(
+    () => prefill?.profile.researchFocus ?? "",
+  );
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>("standard");
   const [customRedactionRules, setCustomRedactionRules] =
     useState<RedactionRule[]>(defaultRules);
@@ -154,17 +176,17 @@ export function InterviewUploadForm() {
 
   const [error, setError] = useState<string | null>(null);
 
-  // 提纲草稿由 /projects/new/outline 带来：URL 只带 ?outline=1 标记位，全文在 sessionStorage。
-  // 读取放在惰性初始化里而不是 effect 里 —— 同步 setState 的 effect 会触发级联渲染（lint 会报）。
-  // 这个子树不会 SSR：useSearchParams 让它在最近的 Suspense 边界内退化成客户端渲染，
-  // 所以首帧就能拿到草稿；typeof window 守卫只是防它以后变成动态渲染。
-  const hasOutlineFlag = searchParams.get(OUTLINE_FLAG_PARAM) === "1";
-  const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState(() =>
-    readInitialOutlineDraft(hasOutlineFlag),
+  const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState(
+    () => prefill?.outlineMarkdown ?? "",
   );
   // 带草稿进来时默认展开折叠区，否则草稿藏在 <details> 里，用户会以为没预填。
   const [outlineDetailsOpen, setOutlineDetailsOpen] = useState(
-    () => readInitialOutlineDraft(hasOutlineFlag).trim().length > 0,
+    () => Boolean(prefill?.outlineMarkdown.trim()),
+  );
+  // 同理：机构/研究焦点预填了却折叠着，用户会以为没填。初值直接看 prefill，
+  // 不看上面那两个 state —— 免得依赖「字段 state 必须先声明」这种隐式次序。
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    Boolean(prefill?.profile.institutionName || prefill?.profile.researchFocus),
   );
 
   useEffect(() => {
@@ -527,7 +549,11 @@ export function InterviewUploadForm() {
                 />
               </details>
 
-              <details className="surface-card rounded-[1.55rem] p-4">
+              <details
+                className="surface-card rounded-[1.55rem] p-4"
+                open={advancedOpen}
+                onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+              >
                 <summary className="cursor-pointer text-sm font-semibold text-foreground">
                   高级设置（选填）
                 </summary>

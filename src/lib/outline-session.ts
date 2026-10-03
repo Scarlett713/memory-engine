@@ -1,3 +1,4 @@
+import { interviewScenarioOptions } from "@/lib/oral-history";
 import type {
   OutlineChatMessage,
   OutlinePlanningContext,
@@ -52,12 +53,20 @@ export function normalizeOutlineProfile(
 ): OutlineProjectProfile {
   const base = createEmptyOutlineProfile();
 
+  // collectionScenario 必须走白名单，不能 `??` 透传：空串不是 null、非法串也非 null，
+  // 两者都会原样过关。而这个值最终会被服务端拿去查模板，非法值时
+  // scenarioTemplateMap[scenario] 是 undefined，取 .outline 直接抛 TypeError → 500。
+  // 收敛在这里，所有消费方（含模型回填的 profile）一次性覆盖。
+  const collectionScenario =
+    interviewScenarioOptions.find(
+      (option) => option.value === profile?.collectionScenario,
+    )?.value ?? base.collectionScenario;
+
   return {
     projectName: profile?.projectName?.trim() ?? base.projectName,
     intervieweeName: profile?.intervieweeName?.trim() ?? base.intervieweeName,
     institutionName: profile?.institutionName?.trim() ?? base.institutionName,
-    collectionScenario:
-      profile?.collectionScenario ?? base.collectionScenario,
+    collectionScenario,
     researchFocus: profile?.researchFocus?.trim() ?? base.researchFocus,
     notes: profile?.notes?.trim() ?? base.notes,
   };
@@ -160,23 +169,25 @@ export function saveOutlineDraftToSession(
   }
 }
 
-export function readOutlineDraftFromSession(): string {
+// 读整份草稿（提纲全文 + 画像）。上传页要拿 profile 预填 Step 1，
+// 所以这里返回整个 session 而不是只返回 markdown。
+export function readOutlineDraftSession(): StoredOutlineSession | null {
   if (typeof window === "undefined") {
-    return "";
+    return null;
   }
 
   try {
     const raw = window.sessionStorage.getItem(OUTLINE_SESSION_STORAGE_KEY);
 
     if (!raw) {
-      return "";
+      return null;
     }
 
     return normalizeOutlineSession(
       JSON.parse(raw) as Partial<StoredOutlineSession>,
-    ).outlineMarkdown;
+    );
   } catch {
-    return "";
+    return null;
   }
 }
 

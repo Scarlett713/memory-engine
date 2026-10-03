@@ -146,32 +146,31 @@ export function OutlinePlanWorkspace() {
     <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5">
       <div className="flex flex-col gap-2">
         <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="archive-mark hidden sm:grid">
-                <span />
-                <span />
-                <span />
-              </div>
-
-              <div>
-                <p className="section-eyebrow">Step 01 · 访谈准备</p>
-                <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
-                  生成个性化访谈提纲
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-                  填写受访者与访谈要点，生成一版可编辑的提纲；确认后会自动带入上传页的「访谈提纲」字段。
-                </p>
-              </div>
+          {/* 返回链接的位置与 class 与上传页、项目详情页保持逐字节一致，
+              别改回右侧槽位的按钮样式 —— 三处要看起来是同一个控件。 */}
+          <div className="flex items-start gap-4">
+            <div className="archive-mark hidden sm:grid">
+              <span />
+              <span />
+              <span />
             </div>
 
-            <Link
-              href="/"
-              className="sidebar-secondary w-full shrink-0 px-5 sm:w-auto"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              返回工作台
-            </Link>
+            <div>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                返回工作台
+              </Link>
+              <p className="section-eyebrow mt-3">Step 01 · 访谈准备</p>
+              <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
+                生成个性化访谈提纲
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+                填写受访者与访谈要点，生成一版可编辑的提纲；确认后会自动带入上传页的「访谈提纲」字段。
+              </p>
+            </div>
           </div>
         </header>
 
