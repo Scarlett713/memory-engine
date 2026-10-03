@@ -10,6 +10,16 @@ const PUBLIC_PATHS = [
 
 const STATIC_PREFIXES = ['/_next', '/favicon.ico'];
 
+// BUG-06：/api/* 未登录 / token 失效返 401 JSON，页面路径仍 302 跳 /login。
+// 原先一律 302，前端 fetch 会跟随重定向拿到 HTML，各 route 内的 401 分支形同虚设。
+function isApiPath(pathname: string) {
+  return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+function unauthorized() {
+  return NextResponse.json({ message: '未登录。' }, { status: 401 });
+}
+
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -27,6 +37,10 @@ export default async function proxy(req: NextRequest) {
   const token = req.cookies.get('memory-engine-token')?.value;
 
   if (!token) {
+    if (isApiPath(pathname)) {
+      return unauthorized();
+    }
+
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
@@ -35,6 +49,10 @@ export default async function proxy(req: NextRequest) {
   // 验证 token
   const payload = await verifyToken(token);
   if (!payload) {
+    if (isApiPath(pathname)) {
+      return unauthorized();
+    }
+
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     loginUrl.searchParams.set('reason', 'expired');

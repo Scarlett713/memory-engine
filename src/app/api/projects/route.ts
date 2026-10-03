@@ -1,41 +1,19 @@
 import { NextResponse } from "next/server";
 
 import {
+  ALLOWED_COLLECTION_PATHS,
+  ALLOWED_COLLECTION_SCENARIOS,
+  ALLOWED_CONFIDENTIALITY_LEVELS,
+  ALLOWED_PRIVACY_LEVELS,
+  parseEnumValue,
+} from "@/lib/server/enum";
+import {
   createProject,
   isProjectOwnedBy,
   listProjects,
 } from "@/lib/server/project-store";
 import { saveInterviewAudio } from "@/lib/server/upload-store";
-import type {
-  CollectionPath,
-  ConfidentialityLevel,
-  InterviewScenario,
-  PrivacyLevel,
-  RedactionRule,
-  UserType,
-} from "@/lib/types/project";
-
-const confidentialityLevelValues: readonly ConfidentialityLevel[] = [
-  "public",
-  "internal",
-  "confidential",
-];
-
-const collectionPathValues: readonly CollectionPath[] = [
-  "upload",
-  "ai_interview",
-];
-
-// FormData 里的枚举值一律白名单校验，非法值退回 fallback（与 parseCustomRedactionRules 同一防御风格）
-function parseEnumValue<T extends string>(
-  value: FormDataEntryValue | null,
-  allowed: readonly T[],
-  fallback: T,
-): T {
-  const raw = typeof value === "string" ? value.trim() : "";
-
-  return allowed.includes(raw as T) ? (raw as T) : fallback;
-}
+import type { RedactionRule, UserType } from "@/lib/types/project";
 
 function parseCustomRedactionRules(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !value.trim()) {
@@ -105,23 +83,27 @@ export async function POST(request: Request) {
     const notes = formData.get("notes")?.toString().trim() ?? "";
     const outlineDraftMarkdown =
       formData.get("outlineDraftMarkdown")?.toString() ?? "";
-    const collectionScenario =
-      (formData.get("collectionScenario")?.toString().trim() as InterviewScenario) ||
-      "urban_memory";
+    const collectionScenario = parseEnumValue(
+      formData.get("collectionScenario"),
+      ALLOWED_COLLECTION_SCENARIOS,
+      "urban_memory",
+    );
     const researchFocus =
       formData.get("researchFocus")?.toString().trim() ?? "";
-    const privacyLevel =
-      (formData.get("privacyLevel")?.toString().trim() as PrivacyLevel) ||
-      "standard";
+    const privacyLevel = parseEnumValue(
+      formData.get("privacyLevel"),
+      ALLOWED_PRIVACY_LEVELS,
+      "standard",
+    );
     const language = formData.get("language")?.toString().trim() ?? "";
     const confidentialityLevel = parseEnumValue(
       formData.get("confidentialityLevel"),
-      confidentialityLevelValues,
+      ALLOWED_CONFIDENTIALITY_LEVELS,
       "internal",
     );
     const collectionPath = parseEnumValue(
       formData.get("collectionPath"),
-      collectionPathValues,
+      ALLOWED_COLLECTION_PATHS,
       "upload",
     );
     const customRedactionRules = parseCustomRedactionRules(
