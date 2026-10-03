@@ -138,8 +138,107 @@ function getMissingPrompt(input: LlmOutlineChatInput) {
   return "我先把提纲整理成可编辑草稿了。你可以继续补充细节，我会按上下文继续细化。";
 }
 
+type MockInterviewAnswer = {
+  question: string;
+  isFollowUp: boolean;
+  coveredItemIds: string[];
+  isComplete: boolean;
+};
+
+// REQ-14：askQuestion 被两条链路共用——/ask 是自由问答（散文契约），
+// next-question 是访谈逐问（JSON 契约）。用模板标志串区分。
+const INTERVIEW_PROMPT_MARKER = "【访谈提纲条目】";
+
+// 从渲染好的 prompt 里抠出 JSON 数组字面量。
+function readPromptJsonArray(
+  pattern: RegExp,
+  prompt: string,
+): unknown[] | null {
+  const raw = prompt.match(pattern)?.[1];
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// ⚠️ 下面两个正则与 buildInterviewQuestionPrompt 的渲染格式耦合：
+//   {{CHECKLIST}}    → JSON.stringify(checklist, null, 2)，跟在标志串那一行之后
+//   {{COVERED_IDS}}  → JSON.stringify(coveredItemIds)，单行
+// 若 prompt 模板或渲染方式变动，需同步更新此处解析逻辑。判据见函数第 3 步：
+// 格式漂移不会静默降级成散文，只会退到通用兜底问题。
+const CHECKLIST_BLOCK_PATTERN = /【访谈提纲条目】[^\n]*\n(\[[\s\S]*?\n\])/;
+const COVERED_IDS_PATTERN = /已覆盖条目 id：(\[[^\n]*\])/;
+
+function buildMockInterviewAnswer(prompt: string): MockInterviewAnswer | null {
+  // 1. 不是访谈 prompt → 交回原来的散文分支（/ask 链路不受影响）。
+  if (!prompt.includes(INTERVIEW_PROMPT_MARKER)) {
+    return null;
+  }
+
+  // 2. 抽 checklist。
+  const checklist = (
+    readPromptJsonArray(CHECKLIST_BLOCK_PATTERN, prompt) ?? []
+  )
+    .map((entry) => {
+      const item = entry as { id?: unknown; text?: unknown } | null;
+      const id = typeof item?.id === "string" ? item.id : "";
+      const text = typeof item?.text === "string" ? item.text : "";
+      return id && text ? { id, text } : null;
+    })
+    .filter((item): item is { id: string; text: string } => item !== null);
+
+  // 3. 是访谈 prompt 却一条都没解析出来 = 渲染格式变了。刻意不返回 null：
+  //    null 会退到散文分支 → 路由 parse 失败 → 502，整条访谈链路在 mock 下死掉，
+  //    且没有任何报错指向格式漂移。回一份合法 JSON 兜底，表现为「问题永远停在
+  //    第 1 题」，比整条链路 502 好定位。
+  if (checklist.length === 0) {
+    return {
+      question: "（Mock）请谈谈您印象最深的一段经历。",
+      isFollowUp: false,
+      coveredItemIds: [],
+      isComplete: false,
+    };
+  }
+
+  // 4. 取第一条未覆盖条目；全问完则收尾（控制台据此走 FINISH）。
+  const covered = new Set(
+    (readPromptJsonArray(COVERED_IDS_PATTERN, prompt) ?? []).map((id) =>
+      String(id),
+    ),
+  );
+  const next = checklist.find((item) => !covered.has(item.id));
+
+  if (!next) {
+    return {
+      question: "（Mock）今天的访谈就到这里，谢谢您。",
+      isFollowUp: false,
+      coveredItemIds: [],
+      isComplete: true,
+    };
+  }
+
+  return {
+    question: `（Mock）${next.text}`,
+    isFollowUp: false,
+    coveredItemIds: [next.id],
+    isComplete: false,
+  };
+}
+
 export class MockLlmProvider implements LlmProvider {
   async askQuestion(prompt: string): Promise<LlmAskResult> {
+    const interview = buildMockInterviewAnswer(prompt);
+
+    if (interview) {
+      return { answer: JSON.stringify(interview) };
+    }
+
     return {
       answer:
         "（Mock 模式）当前为模拟问答环境，暂不基于访谈内容作答。配置 LLM_PROVIDER=ark 与 LLM_API_KEY 后即可获得真实回答。",

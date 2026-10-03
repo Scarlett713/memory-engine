@@ -98,9 +98,12 @@ export function buildInterviewQuestionPrompt(
   input: InterviewQuestionPromptInput,
 ): string {
   const checklist = normalizeChecklist(input.checklist);
+  // 入参是跨问累积态，不设条数上限（见 normalizeCoveredItemIds 的注释）；
+  // 3 条上限只属于出参解析。
   const coveredItemIds = normalizeCoveredItemIds(
     input.coveredItemIds,
     checklist.map((item) => item.id),
+    Number.POSITIVE_INFINITY,
   );
   const recentTranscript = input.recentTranscript.trim();
   const outlineMarkdown = (input.outlineMarkdown ?? "").trim();
@@ -232,11 +235,17 @@ export function normalizeChecklist(value: unknown): InterviewOutlineItem[] {
   return items;
 }
 
-// 覆盖态归一化：去重 + 只认字符串/数字 id + 最多 MAX_COVERED_ITEM_IDS 条；
+// 覆盖态归一化：去重 + 只认字符串/数字 id + 最多 maxItems 条；
 // 传 checklistIds 时过滤模型虚构的 id（覆盖态必须幂等）。
+//
+// maxItems 默认 MAX_COVERED_ITEM_IDS：那是「模型单轮最多认领几条」的上限，
+// 解析出参时必须留。但喂 prompt 的**累积态**不能套这个上限——累积到第 4 条起
+// 会被砍回 3 条，prompt 里的 {{COVERED_IDS}} / {{REMAINING}} 从此冻结，
+// 模型每轮重复提议同一条，访谈再也走不到 isComplete。那种场景传 Infinity。
 export function normalizeCoveredItemIds(
   value: unknown,
   checklistIds?: readonly string[],
+  maxItems: number = MAX_COVERED_ITEM_IDS,
 ): string[] {
   if (!Array.isArray(value)) return [];
 
@@ -256,7 +265,7 @@ export function normalizeCoveredItemIds(
 
     seen.add(id);
     ids.push(id);
-    if (ids.length >= MAX_COVERED_ITEM_IDS) break;
+    if (ids.length >= maxItems) break;
   }
 
   return ids;

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -26,7 +33,7 @@ import type { ProjectRecord } from "@/lib/types/project";
  * | --------------------- | ------------------------------------------- | ------------------------- |
  * | INITIALIZED           | initializing                                | ready                     |
  * | START                 | ready                                       | ai_thinking               |
- * | AI_QUESTION_READY     | ai_thinking                                 | ai_asking                 |
+ * | AI_QUESTION_READY     | ai_thinking                                 | ai_asking（见下）         |
  * | USER_START_ANSWERING  | ai_asking                                   | user_answering            |
  * | USER_DONE_SPEAKING    | user_answering                              | ai_thinking               |
  * | NEXT_QUESTION_READY   | ai_thinking                                 | ai_asking（题号 +1）      |
@@ -48,6 +55,12 @@ import type { ProjectRecord } from "@/lib/types/project";
  *
  * prevPhase 与 resumedPhase 分开：前者是异常回退（FAIL/RETRY），后者是暂停恢复
  * （PAUSE/RESUME），两者生命周期不同，不合并。
+ *
+ * Step 4：ai_thinking 不再走占位定时器，改为真实 POST
+ * …/interview/next-question。该 action 现在同时承担首问与后续每一问
+ * （NEXT_QUESTION_READY 因此暂时没有生产者，保留给 Step 5+ 的「待补录」兜底）：
+ * 按 isFollowUp 决定是否推进题号、累积 coveredItemIds，并把本轮字幕存进
+ * transcript 后清空。回包 done 则直接 FINISH。
  */
 
 export type InterviewPhase =
@@ -72,6 +85,12 @@ type InterviewState = {
   captions: string;
   /** 当前未定格的临时字幕，每次覆盖；与 captions 分开存才能既追加又覆盖。 */
   interimCaption: string;
+  /** 会话级完整转写：每问结束把 captions 并进来，captions 本身则逐问清空。 */
+  transcript: string;
+  /** 当前题已连续追问的次数。推进到下一题时归零。 */
+  followUpCount: number;
+  /** 已覆盖的提纲条目 id（服务端下发的不透明 token），跨问累积。 */
+  coveredItemIds: string[];
   /** RESUME 回到暂停前的 phase。 */
   resumedPhase: InterviewPhase | null;
   /** FAIL 时记下出错前 phase，供 RETRY 原路返回。 */
@@ -83,7 +102,12 @@ type InterviewState = {
 type InterviewAction =
   | { type: "INITIALIZED" }
   | { type: "START" }
-  | { type: "AI_QUESTION_READY"; question: string; questionIndex?: number }
+  | {
+      type: "AI_QUESTION_READY";
+      question: string;
+      isFollowUp: boolean;
+      coveredItemIds: string[];
+    }
   | { type: "USER_START_ANSWERING" }
   | { type: "USER_DONE_SPEAKING" }
   | { type: "NEXT_QUESTION_READY"; question: string; questionIndex?: number }
@@ -102,6 +126,9 @@ const INITIAL_STATE: InterviewState = {
   currentQuestion: "",
   captions: "",
   interimCaption: "",
+  transcript: "",
+  followUpCount: 0,
+  coveredItemIds: [],
   resumedPhase: null,
   prevPhase: null,
   pauseReason: null,
@@ -124,8 +151,7 @@ const FINISHABLE_PHASES: readonly InterviewPhase[] = [
 
 const OUTLINE_PREVIEW_COUNT = 3;
 
-/** ⚠️ Step 3/4 占位定时器时长，真实实现接好后随占位块一起删除。 */
-const AI_THINKING_PLACEHOLDER_MS = 800;
+/** ⚠️ Step 6 之前的上传占位：真实上传接口接好后随占位块一起删除。 */
 const UPLOAD_PLACEHOLDER_MS = 900;
 
 /**
@@ -168,7 +194,27 @@ function interviewReducer(
         ...state,
         phase: "ai_asking",
         currentQuestion: action.question,
-        questionIndex: action.questionIndex ?? state.questionIndex,
+        // 首问不推进题号：进 ai_thinking 前 currentQuestion 还是空串，就说明一次
+        // 都还没问过（沿用被删掉的占位分支判「首问 / 下一问」的同一写法）。
+        questionIndex:
+          action.isFollowUp || !state.currentQuestion
+            ? state.questionIndex
+            : state.questionIndex + 1,
+        followUpCount: action.isFollowUp ? state.followUpCount + 1 : 0,
+        // 不能用 normalizeCoveredItemIds：它按 MAX_COVERED_ITEM_IDS=3 截断，
+        // 累计覆盖态会被砍回 3 条。回包只含「本轮新增」，必须并集。
+        coveredItemIds: [
+          ...new Set([...state.coveredItemIds, ...action.coveredItemIds]),
+        ],
+        // 清空本轮字幕前先并进会话转写：paused 弹窗的「已记录文字」与 Step 5 的
+        // 崩溃恢复都要完整已识别文字。首问时 captions 为空，自然跳过。
+        transcript: state.captions
+          ? state.transcript
+            ? `${state.transcript}\n${state.captions}`
+            : state.captions
+          : state.transcript,
+        captions: "",
+        interimCaption: "",
       };
 
     case "USER_START_ANSWERING":
@@ -374,43 +420,91 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
     };
   }, [phase, resumeRecording]);
 
-  // ⚠️ Step 3/4 占位：真实实现接好后整块删除。
-  // ai_thinking 应改为 await POST /api/projects/{id}/interview/next-question；
-  // uploading 应改为 await POST /api/projects/{id}/interview/audio。
-  // 现在只为让 9 个 phase 分支在一次手动走查里全部可见，不碰网络。
-  useEffect(() => {
-    if (phase === "ai_thinking") {
-      const timer = window.setTimeout(() => {
-        if (state.currentQuestion) {
-          const nextIndex = state.questionIndex + 1;
-          dispatch({
-            type: "NEXT_QUESTION_READY",
-            question: outlineItems[nextIndex] ?? `（提纲已聊完，第 ${nextIndex + 1} 问占位）`,
-            questionIndex: nextIndex,
-          });
-          return;
-        }
-        dispatch({
-          type: "AI_QUESTION_READY",
-          question: outlineItems[0] ?? "（提纲暂无可解析条目）",
-          questionIndex: 0,
-        });
-      }, AI_THINKING_PLACEHOLDER_MS);
-
-      return () => window.clearTimeout(timer);
-    }
-
-    if (phase === "uploading") {
-      const timer = window.setTimeout(
-        () => dispatch({ type: "UPLOAD_DONE" }),
-        UPLOAD_PLACEHOLDER_MS,
+  // 每问一次真实请求。首问（START）与后续每一问都走这里。
+  const fetchNextQuestion = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/projects/${project.id}/interview/next-question`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questionIndex: state.questionIndex,
+            followUpCount: state.followUpCount,
+            coveredItemIds: state.coveredItemIds,
+            lastAnswer: state.captions,
+          }),
+        },
       );
 
-      return () => window.clearTimeout(timer);
+      if (!res.ok) {
+        // 路由的失败信封是 { error }，直接 res.text() 会把 JSON 原文糊到 error phase 上。
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+          message?: string;
+        } | null;
+
+        throw new Error(
+          payload?.error ?? payload?.message ?? "请求失败，请重试。",
+        );
+      }
+
+      const data = (await res.json()) as {
+        done: boolean;
+        question: string;
+        isFollowUp?: boolean;
+        coveredItemIds?: string[];
+      };
+
+      if (data.done) {
+        // 提纲聊完，直接进上传。FINISHABLE_PHASES 含 ai_thinking，成立。
+        dispatch({ type: "FINISH" });
+        return;
+      }
+
+      dispatch({
+        type: "AI_QUESTION_READY",
+        question: data.question,
+        isFollowUp: data.isFollowUp ?? false,
+        coveredItemIds: data.coveredItemIds ?? [],
+      });
+    } catch (error) {
+      dispatch({
+        type: "FAIL",
+        message: error instanceof Error ? error.message : "网络错误，请重试",
+      });
+    }
+  }, [
+    project.id,
+    state.questionIndex,
+    state.followUpCount,
+    state.coveredItemIds,
+    state.captions,
+  ]);
+
+  // 不加取消守卫：迟到的回包是安全的——AI_QUESTION_READY 在 reducer 里有 phase
+  // 前置判定，用户在请求飞行中结束/暂停时它会被静默丢弃。
+  useEffect(() => {
+    if (phase !== "ai_thinking") {
+      return;
     }
 
-    return undefined;
-  }, [phase, state.currentQuestion, state.questionIndex, outlineItems]);
+    void fetchNextQuestion();
+  }, [phase, fetchNextQuestion]);
+
+  // ⚠️ Step 6 占位：uploading 应改为 await POST /api/projects/{id}/interview/audio。
+  useEffect(() => {
+    if (phase !== "uploading") {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(
+      () => dispatch({ type: "UPLOAD_DONE" }),
+      UPLOAD_PLACEHOLDER_MS,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [phase]);
 
   if (phase === "done") {
     // 不渲染，跳转由上面的 effect 负责。
