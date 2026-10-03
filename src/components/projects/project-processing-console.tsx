@@ -96,31 +96,51 @@ function TextPanel({
   // 必须用 useId 而非硬编码 id：内联实例（hidden xl:block，仍在 DOM 里）
   // 与弹层实例可能同时存在，硬编码会让 aria-controls 指向重复 id。
   const contentId = useId();
+  // 收起时要滚回卡片。ref 只能挂在自己的 div 上——SurfaceSection 不接受 ref，
+  // 而本轮的改动范围限定在这一个文件里。
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const clamped = clampBody && content.length > DRAFT_CLAMP_CHAR_THRESHOLD;
 
+  function handleToggle() {
+    if (isExpanded) {
+      setIsExpanded(false);
+      // 收起后卡片骤短，scrollTop 不变会把视口甩到下方内容上。
+      // 用 rAF 而不是 useLayoutEffect：本组件会被服务端预渲染，useLayoutEffect 会打 SSR 警告；
+      // rAF 回调在 React 结束事件内的同步 flush 之后、下一次 paint 之前跑，DOM 已是收起后的高度。
+      requestAnimationFrame(() => {
+        // block: "nearest" = 卡片在视口上方时最小幅度滚动，让刚点过的按钮停在鼠标下
+        containerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    } else {
+      setIsExpanded(true);
+    }
+  }
+
   return (
-    <SurfaceSection title={title} icon={Icon} tag={tag} dense={dense}>
-      <div
-        id={contentId}
-        className={`whitespace-pre-wrap wrap-break-word text-sm leading-7 text-muted ${
-          clamped && !isExpanded ? DRAFT_CLAMP_CLASS : ""
-        }`}
-      >
-        {content || "暂无内容"}
-      </div>
-      {clamped ? (
-        <button
-          type="button"
-          aria-expanded={isExpanded}
-          aria-controls={contentId}
-          onClick={() => setIsExpanded((value) => !value)}
-          className="mt-2 rounded-full px-2 py-1 text-xs font-semibold text-accent-strong transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
+    <div ref={containerRef} className="min-w-0">
+      <SurfaceSection title={title} icon={Icon} tag={tag} dense={dense}>
+        <div
+          id={contentId}
+          className={`whitespace-pre-wrap wrap-break-word text-sm leading-7 text-muted ${
+            clamped && !isExpanded ? DRAFT_CLAMP_CLASS : ""
+          }`}
         >
-          {isExpanded ? "收起" : "展开全文"}
-        </button>
-      ) : null}
-    </SurfaceSection>
+          {content || "暂无内容"}
+        </div>
+        {clamped ? (
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={contentId}
+            onClick={handleToggle}
+            className="mt-2 rounded-full px-2 py-1 text-xs font-semibold text-accent-strong transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
+          >
+            {isExpanded ? "收起" : "展开全文"}
+          </button>
+        ) : null}
+      </SurfaceSection>
+    </div>
   );
 }
 
@@ -688,9 +708,12 @@ function ResultGrid({
 
   return (
     <div className="grid w-full min-w-0 gap-4">
+      {/* 双列各自独立流动（flex-col），不用 grid row：grid row 会强制左右同行等高，
+          限高后的整理稿下面会留一大片空白。
+          flex-col 的 align-items: stretch 作用在交叉轴（宽度）上，卡片照样撑满列宽；
+          纵向按内容高度自然堆叠。小屏单列 fallback 顺序 = 左列 4 卡 → 右列 3 卡 → 转写稿。 */}
       <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
-        {/* self-start：左列只剩一张限高卡，不让它被右列高度拉成一张空白大卡 */}
-        <div className="grid min-w-0 self-start gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <TextPanel
             title="脱敏整理稿"
             icon={Sparkles}
@@ -699,9 +722,12 @@ function ResultGrid({
             dense={expanded}
             clampBody
           />
+          <KeywordsPanel keywords={project.keywords} dense={expanded} />
+          <TimelinePanel events={project.timelineEvents} dense={expanded} />
+          <StructuredPanel sections={project.structuredSections} dense={expanded} />
         </div>
 
-        <div className="grid min-w-0 gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <TextPanel
             title="口述摘要"
             icon={ScanText}
@@ -709,7 +735,6 @@ function ResultGrid({
             tag="Summary"
             dense={expanded}
           />
-          <KeywordsPanel keywords={project.keywords} dense={expanded} />
           <EmotionPanel
             signals={project.emotionalSignals}
             collectionPath={project.collectionPath}
@@ -725,12 +750,7 @@ function ResultGrid({
         </div>
       </div>
 
-      <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[0.9fr_1.1fr]" : "xl:grid-cols-[0.92fr_1.08fr]"}`}>
-        <TimelinePanel events={project.timelineEvents} dense={expanded} />
-        <StructuredPanel sections={project.structuredSections} dense={expanded} />
-      </div>
-
-      {/* 第三行全宽：转写稿只是对照用，默认收起，不占首屏 */}
+      {/* 栅格之后全宽：转写稿只是对照用，默认收起，不占首屏 */}
       <TranscriptPanel content={project.transcriptRaw} dense={expanded} />
     </div>
   );
