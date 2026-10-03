@@ -711,7 +711,7 @@ function ResultGrid({
       {/* 双列各自独立流动（flex-col），不用 grid row：grid row 会强制左右同行等高，
           限高后的整理稿下面会留一大片空白。
           flex-col 的 align-items: stretch 作用在交叉轴（宽度）上，卡片照样撑满列宽；
-          纵向按内容高度自然堆叠。小屏单列 fallback 顺序 = 左列 4 卡 → 右列 3 卡 → 转写稿。 */}
+          纵向按内容高度自然堆叠。小屏单列 fallback 顺序 = 左列 3 卡 → 右列 4 卡 → 转写稿。 */}
       <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
         <div className="flex min-w-0 flex-col gap-4">
           <TextPanel
@@ -722,7 +722,6 @@ function ResultGrid({
             dense={expanded}
             clampBody
           />
-          <KeywordsPanel keywords={project.keywords} dense={expanded} />
           <TimelinePanel events={project.timelineEvents} dense={expanded} />
           <StructuredPanel sections={project.structuredSections} dense={expanded} />
         </div>
@@ -735,6 +734,7 @@ function ResultGrid({
             tag="Summary"
             dense={expanded}
           />
+          <KeywordsPanel keywords={project.keywords} dense={expanded} />
           <EmotionPanel
             signals={project.emotionalSignals}
             collectionPath={project.collectionPath}
