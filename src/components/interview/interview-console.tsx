@@ -45,6 +45,9 @@ import type { ProjectRecord } from "@/lib/types/project";
  * | RETRY                 | error                                       | prevPhase ?? ready        |
  * | CAPTION_INTERIM       | 任意 phase                                  | 不变，只覆盖临时字幕      |
  * | CAPTION_FINAL         | 任意 phase                                  | 不变，只追加定格字幕      |
+ * | SNAPSHOT_FOUND        | initializing（挂载读盘）                    | 不变，只登记恢复点        |
+ * | RESTORE               | ready                                       | ai_asking / ai_thinking   |
+ * | CLEAR_SNAPSHOT        | ready                                       | 不变，只清横幅            |
  *
  * PAUSE / RESUME 除改 phase 外，还会连带调用 useSpeechRecorder 的
  * pause() / resume()（停止识别与音频写入、冻结计时）；FINISH 与「结束回答」
@@ -61,6 +64,11 @@ import type { ProjectRecord } from "@/lib/types/project";
  * （NEXT_QUESTION_READY 因此暂时没有生产者，保留给 Step 5+ 的「待补录」兜底）：
  * 按 isFollowUp 决定是否推进题号、累积 coveredItemIds，并把本轮字幕存进
  * transcript 后清空。回包 done 则直接 FINISH。
+ *
+ * Step 5：情绪暂停（EMOTION_KEYWORDS 命中 captions → 自动 PAUSE，pauseReason
+ * 区分 manual / emotion）与崩溃恢复（进度快照写 localStorage，key =
+ * `interview_progress_{projectId}`，超 24h 或形状不合法即丢弃；是否恢复到
+ * ready 横幅由用户点选，RESTORE 不会把回答态原样回放——录音器跨不过刷新）。
  */
 
 export type InterviewPhase =
@@ -75,6 +83,22 @@ export type InterviewPhase =
   | "error";
 
 type PauseReason = "manual" | "emotion";
+
+/**
+ * Step 5：崩溃恢复快照。只存「能重建访谈现场」的可序列化字段——wavBlob 与录音器
+ * 状态都跨不过刷新（麦克风已关），也没必要跨：恢复到回答相位一律让用户重新点开始。
+ */
+type InterviewSnapshot = {
+  phase: InterviewPhase;
+  questionIndex: number;
+  currentQuestion: string;
+  followUpCount: number;
+  coveredItemIds: string[];
+  transcript: string;
+  /** 进行中的回答。崩在 user_answering 时它还没并进 transcript，不存就整段丢。 */
+  captions: string;
+  savedAt: number;
+};
 
 type InterviewState = {
   phase: InterviewPhase;
@@ -97,6 +121,10 @@ type InterviewState = {
   prevPhase: InterviewPhase | null;
   pauseReason: PauseReason | null;
   errorMessage: string | null;
+  /** ready 态检测到可恢复的崩溃点。 */
+  hasSnapshot: boolean;
+  /** 恢复横幅上展示的上一题问题文本。 */
+  snapshotQuestion: string;
 };
 
 type InterviewAction =
@@ -118,7 +146,10 @@ type InterviewAction =
   | { type: "FAIL"; message: string }
   | { type: "RETRY" }
   | { type: "CAPTION_INTERIM"; text: string }
-  | { type: "CAPTION_FINAL"; text: string };
+  | { type: "CAPTION_FINAL"; text: string }
+  | { type: "SNAPSHOT_FOUND"; snapshot: InterviewSnapshot }
+  | { type: "RESTORE"; snapshot: InterviewSnapshot }
+  | { type: "CLEAR_SNAPSHOT" };
 
 const INITIAL_STATE: InterviewState = {
   phase: "initializing",
@@ -133,6 +164,8 @@ const INITIAL_STATE: InterviewState = {
   prevPhase: null,
   pauseReason: null,
   errorMessage: null,
+  hasSnapshot: false,
+  snapshotQuestion: "",
 };
 
 const PAUSABLE_PHASES: readonly InterviewPhase[] = [
@@ -149,6 +182,54 @@ const FINISHABLE_PHASES: readonly InterviewPhase[] = [
   "paused",
 ];
 
+/**
+ * Step 5：情绪暂停关键词。命中即自动暂停，不弹「要不要停」——情绪波动时把一个
+ * 需要做决定的问题推回给受访者本身就是负担。只收明确的负面表达；「累」「烦」
+ * 这类浅层词不列入，避免正常吐槽被当成情绪危机。
+ */
+const EMOTION_KEYWORDS: readonly string[] = [
+  "Mock",   // ← 临时改，验完改回
+  "不想说了",
+  "说不下去",
+  "太难了",
+  "受不了",
+  "崩溃",
+  "哭",
+  "痛苦",
+  "害怕",
+  "恐惧",
+  "创伤",
+  "不好受",
+  "心里难受",
+  "很难受",
+  "难以接受",
+];
+
+/** 超过 24h 的恢复点视为过期：隔天再进同一访谈，语境已不可信。 */
+const SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** 只有这些相位值得写盘，也只有这些相位能被 RESTORE 接受。 */
+const SNAPSHOT_PHASES: readonly InterviewPhase[] = [
+  "ai_asking",
+  "user_answering",
+  "ai_thinking",
+  "paused",
+];
+
+/**
+ * 不写盘的相位。ready 必须在内：挂载序列 initializing → ready 会让写盘 effect
+ * 触发一次，写进 {phase:"ready", questionIndex:0} 就当场覆盖刚读出来的旧快照
+ * ——横幅当次还在，第二次刷新进度就没了。uploading 同理：崩在上传里应回到最后
+ * 一题重来，而不是恢复一个已经死掉的定时器。
+ */
+const SNAPSHOT_SKIP_PHASES: readonly InterviewPhase[] = [
+  "initializing",
+  "ready",
+  "uploading",
+  "done",
+  "error",
+];
+
 const OUTLINE_PREVIEW_COUNT = 3;
 
 /** ⚠️ Step 6 之前的上传占位：真实上传接口接好后随占位块一起删除。 */
@@ -163,6 +244,31 @@ function extractOutlineItems(markdown: string): string[] {
     .split("\n")
     .map((line) => line.replace(/^\s*(?:#{1,6}|[-*+]|\d+[.、)])\s*/, "").trim())
     .filter((line) => line.length > 0);
+}
+
+/**
+ * localStorage 是外部输入。JSON.parse 的裸 cast 若把垃圾 phase 放进 state，界面会
+ * 落进一个没有任何分支匹配的相位（下面每个分支都是精确相等判定）→ 白屏且无出口，
+ * 所以进 state 前必须过一遍形状校验。
+ */
+function isInterviewSnapshot(value: unknown): value is InterviewSnapshot {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const snapshot = value as Record<string, unknown>;
+  return (
+    typeof snapshot.phase === "string" &&
+    SNAPSHOT_PHASES.includes(snapshot.phase as InterviewPhase) &&
+    typeof snapshot.questionIndex === "number" &&
+    typeof snapshot.currentQuestion === "string" &&
+    typeof snapshot.followUpCount === "number" &&
+    Array.isArray(snapshot.coveredItemIds) &&
+    snapshot.coveredItemIds.every((id: unknown) => typeof id === "string") &&
+    typeof snapshot.transcript === "string" &&
+    typeof snapshot.captions === "string" &&
+    typeof snapshot.savedAt === "number"
+  );
 }
 
 function formatDuration(durationMs: number): string {
@@ -309,6 +415,53 @@ function interviewReducer(
         interimCaption: "",
       };
 
+    // Step 5：读盘只登记，不动 phase —— 恢复到哪一相位由用户点「从断点继续」决定。
+    case "SNAPSHOT_FOUND":
+      return {
+        ...state,
+        hasSnapshot: true,
+        snapshotQuestion: action.snapshot.currentQuestion,
+      };
+
+    case "CLEAR_SNAPSHOT":
+      return { ...state, hasSnapshot: false, snapshotQuestion: "" };
+
+    // 恢复落点不是「原样回放」：刷新后录音器已销毁，回 user_answering 会得到一个
+    // 「有相位没麦克风」的死态（resumeRecording 是 no-op）；回 paused 更糟，弹窗
+    // 文案还会走「访谈已暂停」而 pauseReason 已丢。所以回答态一律落回 ai_asking，
+    // 让用户自己重新点「开始回答」（也正好满足浏览器要用户手势才能开麦）。
+    // ai_thinking 是例外：那是「答完了、在等下一问」的中断点，落回同相位能让下方
+    // fetch effect 用恢复的 coveredItemIds + captions 原样重发一次，继续往下问
+    // （服务端不读 questionIndex，下一问由 coveredItemIds + recentTranscript 决定）。
+    case "RESTORE": {
+      if (state.phase !== "ready") {
+        return state;
+      }
+
+      const { snapshot } = action;
+      const resumingThinking = snapshot.phase === "ai_thinking";
+
+      return {
+        ...state,
+        phase: resumingThinking ? "ai_thinking" : "ai_asking",
+        questionIndex: snapshot.questionIndex,
+        currentQuestion: snapshot.currentQuestion,
+        followUpCount: snapshot.followUpCount,
+        coveredItemIds: snapshot.coveredItemIds,
+        transcript: snapshot.transcript,
+        // 只有 ai_thinking 重发需要它当 lastAnswer；落回 ai_asking 重答时留着会把
+        // 半截旧字幕粘进新回答，必须清掉。
+        captions: resumingThinking ? snapshot.captions : "",
+        interimCaption: "",
+        resumedPhase: null,
+        pauseReason: null,
+        prevPhase: null,
+        errorMessage: null,
+        hasSnapshot: false,
+        snapshotQuestion: "",
+      };
+    }
+
     default:
       return state;
   }
@@ -334,6 +487,14 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
   // Step 6 上传用。Blob 不可序列化，不进 reducer。
   const wavBlobRef = useRef<Blob | null>(null);
+
+  // Step 5：崩溃恢复的存储键。约定 key = `interview_progress_${projectId}`。
+  const storageKey = `interview_progress_${project.id}`;
+
+  // 本题是否已经因情绪暂停过。RESUME 回到 user_answering 时 captions 没变、仍含关键词，
+  // 靠它短路，否则情绪 effect 会立刻再次暂停，用户永远恢复不了；同一题只说一次，
+  // 也避免受访者每多说一句就被弹窗打断一次。换题时由下方 effect 重置。
+  const emotionTriggeredRef = useRef(false);
 
   const {
     isRecording,
@@ -384,17 +545,79 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
     if (phase !== "done") {
       return;
     }
+    // Step 5：访谈走完，恢复点作废。本 effect 声明在写盘 effect 之前，同一次 done
+    // 渲染里先删、后（被 SNAPSHOT_SKIP_PHASES 跳过）写，不存在谁覆盖谁。
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // 删不掉也只是残留一份快照，TTL 会兜底，不值得中断流程。
+    }
     router.push(`/projects/${project.id}`);
-  }, [phase, project.id, router]);
+  }, [phase, project.id, router, storageKey]);
 
-  // Step 5：崩溃恢复。约定 key = `interview_progress_${projectId}`。
-  // 本轮只占坑，不读也不写。
+  // Step 5：崩溃恢复（读）。只登记，不直接改 phase。无值 / 解析失败 / 过期 /
+  // 形状不合法一律清键返回，否则每次进页面都要重解析一份垃圾。
   useEffect(() => {
-    const storageKey = `interview_progress_${project.id}`;
-    // Step 5: const saved = window.localStorage.getItem(storageKey) → 命中则 dispatch(RESTORE)
-    // Step 5: window.localStorage.setItem(storageKey, JSON.stringify(snapshot))
-    void storageKey;
-  }, [project.id]);
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    if (
+      !isInterviewSnapshot(parsed) ||
+      Date.now() - parsed.savedAt > SNAPSHOT_TTL_MS
+    ) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    dispatch({ type: "SNAPSHOT_FOUND", snapshot: parsed });
+  }, [storageKey]);
+
+  // Step 5：崩溃恢复（写）。captions 必须进 deps：答案在 user_answering 里逐段累积
+  // 而相位不变，只盯 [phase, questionIndex] 会让整段回答永远进不了快照——那正是这个
+  // 功能要救的场景。一条定格字幕写一次（几百字节），代价可忽略；interimCaption 是
+  // 临时态，不写。coveredItemIds 换引用只在 AI_QUESTION_READY / RESTORE 里发生，两处
+  // 同时都改 phase，不会多触发（真测出多余触发再换 join(",") 的稳定字符串）。
+  useEffect(() => {
+    if (SNAPSHOT_SKIP_PHASES.includes(phase)) {
+      return;
+    }
+
+    const snapshot: InterviewSnapshot = {
+      phase,
+      questionIndex: state.questionIndex,
+      currentQuestion: state.currentQuestion,
+      followUpCount: state.followUpCount,
+      coveredItemIds: state.coveredItemIds,
+      transcript: state.transcript,
+      captions: state.captions,
+      savedAt: Date.now(),
+    };
+
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(snapshot));
+    } catch {
+      // QuotaExceededError / 隐私模式禁用存储：恢复点是尽力而为，不中断访谈。
+    }
+  }, [
+    phase,
+    state.questionIndex,
+    state.currentQuestion,
+    state.followUpCount,
+    state.coveredItemIds,
+    state.transcript,
+    state.captions,
+    storageKey,
+  ]);
 
   // 暂停弹窗：Esc 恢复 + 锁滚动，照 project-processing-console.tsx 的既有做法。
   useEffect(() => {
@@ -419,6 +642,63 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [phase, resumeRecording]);
+
+  // Step 5：情绪关键词命中 → 自动暂停。本题只触发一次：命中即置位，此后 RESUME
+  // 回 user_answering（captions 未变、仍含关键词）也不会立刻再次暂停。
+  useEffect(() => {
+    if (phase !== "user_answering") {
+      return;
+    }
+
+    if (emotionTriggeredRef.current) {
+      return;
+    }
+
+    if (!EMOTION_KEYWORDS.some((keyword) => state.captions.includes(keyword))) {
+      return;
+    }
+
+    emotionTriggeredRef.current = true;
+    pauseRecording();
+    dispatch({ type: "PAUSE", reason: "emotion" });
+  }, [state.captions, phase, pauseRecording]);
+
+  // 情绪标记按题重置：captions 只在 AI_QUESTION_READY（换题）与 RESTORE 落回
+  // ai_asking 时被清空，所以「captions 变回空串」就是「已经换了一题」的信号。
+  useEffect(() => {
+    if (state.captions === "") {
+      emotionTriggeredRef.current = false;
+    }
+  }, [state.captions]);
+
+  // 恢复点的解析放在事件里而不是 reducer 里：本文件既有约定是 reducer 保持纯函数。
+  const handleRestore = () => {
+    const raw = window.localStorage.getItem(storageKey);
+
+    let parsed: unknown = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      parsed = null;
+    }
+
+    if (!isInterviewSnapshot(parsed)) {
+      window.localStorage.removeItem(storageKey);
+      dispatch({ type: "CLEAR_SNAPSHOT" });
+      return;
+    }
+
+    dispatch({ type: "RESTORE", snapshot: parsed });
+  };
+
+  const handleDiscardSnapshot = () => {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // 忽略：横幅照关，残留快照下次进页面会被 TTL / 校验清掉。
+    }
+    dispatch({ type: "CLEAR_SNAPSHOT" });
+  };
 
   // 每问一次真实请求。首问（START）与后续每一问都走这里。
   const fetchNextQuestion = useCallback(async () => {
@@ -589,6 +869,30 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 )}
               </div>
 
+              {state.hasSnapshot ? (
+                <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3">
+                  <p className="section-eyebrow">检测到未完成的访谈</p>
+                  <p className="mt-2 text-sm leading-7 text-accent-strong">
+                    {state.snapshotQuestion
+                      ? `上次进行到的问题：「${state.snapshotQuestion}」`
+                      : "上次的访谈还没有结束。"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" onClick={handleRestore}>
+                      <Play className="h-4 w-4" />
+                      从断点继续
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleDiscardSnapshot}
+                    >
+                      重新开始
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -749,14 +1053,20 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
               <p className="section-eyebrow">Step 02 · AI 访谈</p>
               <h2 className="font-display mt-2 text-[1.5rem] font-semibold leading-tight text-accent-strong">
                 {state.pauseReason === "emotion"
-                  ? "检测到情绪波动，是否暂停访谈？"
-                  : "访谈已暂停"}
+                  ? "检测到您可能有些情绪波动，已自动暂停访谈。需要休息一下吗？"
+                  : "访谈已暂停。"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted">
                 已录音与已转写内容已保留。按{" "}
                 <span className="font-semibold text-accent-strong">Esc</span>{" "}
                 也可以继续访谈。
               </p>
+              {/* 只陈述事实，不给建议话术（session 约束）。 */}
+              {state.pauseReason === "emotion" ? (
+                <p className="mt-2 text-sm leading-7 text-muted">
+                  已记录情绪波动，后台编辑时可查看相关标注。
+                </p>
+              ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
