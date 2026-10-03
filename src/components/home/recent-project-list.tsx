@@ -96,7 +96,9 @@ export function RecentProjectList({
         className="soft-scroll mt-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto"
       >
         <div className="space-y-3">
-          {isLoading ? (
+          {/* 有项目时不再插占位块：列表已经在屏幕上，这块既没有信息量，又会把
+              下面所有卡片整体下推、在返回首页时造成一次可见的内容抖动。 */}
+          {isLoading && projects.length === 0 ? (
             <div className="surface-card rounded-[1.4rem] p-5 text-sm text-muted">
               正在加载项目列表...
             </div>
