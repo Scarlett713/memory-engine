@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useSpeechRecorder } from "@/hooks/use-speech-recorder";
 import type { ProjectRecord } from "@/lib/types/project";
 
 /**
@@ -35,6 +36,12 @@ import type { ProjectRecord } from "@/lib/types/project";
  * | UPLOAD_DONE           | uploading                                   | done                      |
  * | FAIL                  | 任意非终态                                  | error（记 prevPhase）     |
  * | RETRY                 | error                                       | prevPhase ?? ready        |
+ * | CAPTION_INTERIM       | 任意 phase                                  | 不变，只覆盖临时字幕      |
+ * | CAPTION_FINAL         | 任意 phase                                  | 不变，只追加定格字幕      |
+ *
+ * PAUSE / RESUME 除改 phase 外，还会连带调用 useSpeechRecorder 的
+ * pause() / resume()（停止识别与音频写入、冻结计时）；FINISH 与「结束回答」
+ * 会连带 stop()，否则暂停或结束后麦克风仍在录。
  *
  * START 落到 ai_thinking 而不是直接 ai_asking：PRD §3 模块 3 要「读取提纲 →
  * 生成当前问题」，首问同样是异步的。
@@ -61,8 +68,10 @@ type InterviewState = {
   /** 0-based，当前题号。 */
   questionIndex: number;
   currentQuestion: string;
-  /** Step 3：Web Speech 的 interim/final 汇总。 */
+  /** 已定格的字幕，逐段追加。 */
   captions: string;
+  /** 当前未定格的临时字幕，每次覆盖；与 captions 分开存才能既追加又覆盖。 */
+  interimCaption: string;
   /** RESUME 回到暂停前的 phase。 */
   resumedPhase: InterviewPhase | null;
   /** FAIL 时记下出错前 phase，供 RETRY 原路返回。 */
@@ -83,13 +92,16 @@ type InterviewAction =
   | { type: "FINISH" }
   | { type: "UPLOAD_DONE" }
   | { type: "FAIL"; message: string }
-  | { type: "RETRY" };
+  | { type: "RETRY" }
+  | { type: "CAPTION_INTERIM"; text: string }
+  | { type: "CAPTION_FINAL"; text: string };
 
 const INITIAL_STATE: InterviewState = {
   phase: "initializing",
   questionIndex: 0,
   currentQuestion: "",
   captions: "",
+  interimCaption: "",
   resumedPhase: null,
   prevPhase: null,
   pauseReason: null,
@@ -125,6 +137,14 @@ function extractOutlineItems(markdown: string): string[] {
     .split("\n")
     .map((line) => line.replace(/^\s*(?:#{1,6}|[-*+]|\d+[.、)])\s*/, "").trim())
     .filter((line) => line.length > 0);
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function interviewReducer(
@@ -230,6 +250,19 @@ function interviewReducer(
         prevPhase: null,
       };
 
+    // 字幕两条边不碰 phase：识别结果什么时候回来都不该改变流程状态。
+    case "CAPTION_INTERIM":
+      return { ...state, interimCaption: action.text };
+
+    case "CAPTION_FINAL":
+      return {
+        ...state,
+        captions: state.captions
+          ? `${state.captions}\n${action.text}`
+          : action.text,
+        interimCaption: "",
+      };
+
     default:
       return state;
   }
@@ -252,6 +285,36 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(interviewReducer, INITIAL_STATE);
   const { phase } = state;
+
+  // Step 6 上传用。Blob 不可序列化，不进 reducer。
+  const wavBlobRef = useRef<Blob | null>(null);
+
+  const {
+    isRecording,
+    durationMs,
+    permissionError,
+    start: startRecording,
+    stop: stopRecording,
+    pause: pauseRecording,
+    resume: resumeRecording,
+  } = useSpeechRecorder({
+    onCaption: (text, isFinal) => {
+      dispatch(
+        isFinal
+          ? { type: "CAPTION_FINAL", text }
+          : { type: "CAPTION_INTERIM", text },
+      );
+    },
+    onWavReady: (blob) => {
+      wavBlobRef.current = blob;
+    },
+  });
+
+  // captions 末尾没有换行，临时字幕直拼会粘成「你好我在说」。
+  const captionText =
+    state.captions && state.interimCaption
+      ? `${state.captions}\n${state.interimCaption}`
+      : state.captions || state.interimCaption;
 
   const outlineItems = useMemo(
     () => extractOutlineItems(project.outlineDraftMarkdown),
@@ -298,6 +361,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        resumeRecording();
         dispatch({ type: "RESUME" });
       }
     }
@@ -308,7 +372,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [phase]);
+  }, [phase, resumeRecording]);
 
   // ⚠️ Step 3/4 占位：真实实现接好后整块删除。
   // ai_thinking 应改为 await POST /api/projects/{id}/interview/next-question；
@@ -461,7 +525,11 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 <Button
                   type="button"
                   variant="primary"
-                  onClick={() => dispatch({ type: "USER_START_ANSWERING" })}
+                  onClick={async () => {
+                    // 权限被拒也进 user_answering，横幅会说明原因。
+                    await startRecording();
+                    dispatch({ type: "USER_START_ANSWERING" });
+                  }}
                 >
                   <Mic className="h-4 w-4" />
                   我已听清，开始回答
@@ -469,7 +537,10 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => dispatch({ type: "PAUSE" })}
+                  onClick={() => {
+                    pauseRecording();
+                    dispatch({ type: "PAUSE" });
+                  }}
                 >
                   <Pause className="h-4 w-4" />
                   暂停
@@ -482,27 +553,44 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
             <>
               <div className="flex items-center justify-between gap-3">
                 <p className="section-eyebrow">实时字幕</p>
-                <div className="tape-label">录音中</div>
+                <div className="tape-label">
+                  {isRecording ? `录音中 · ${formatDuration(durationMs)}` : "未录音"}
+                </div>
               </div>
 
-              {/* Step 3: Web Speech interim/final 字幕填入此处，并加「暂停滚动 / 清屏（仅视图）」。 */}
-              <div className="surface-card soft-scroll min-h-[14rem] rounded-[1.55rem] px-4 py-4 text-sm leading-7 text-muted">
-                {state.captions ||
-                  "点击开始录音后，这里会实时显示对话文字。"}
+              {permissionError ? (
+                <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
+                  {permissionError}
+                </div>
+              ) : null}
+
+              {/* Step 3 已接入 Web Speech；「暂停滚动 / 清屏（仅视图）」仍待补。 */}
+              <div className="surface-card soft-scroll min-h-[14rem] whitespace-pre-wrap rounded-[1.55rem] px-4 py-4 text-sm leading-7 text-foreground">
+                {captionText || (
+                  <span className="text-muted">
+                    点击开始录音后，这里会实时显示对话文字。
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="primary"
-                  onClick={() => dispatch({ type: "USER_DONE_SPEAKING" })}
+                  onClick={() => {
+                    stopRecording();
+                    dispatch({ type: "USER_DONE_SPEAKING" });
+                  }}
                 >
                   结束回答
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => dispatch({ type: "PAUSE" })}
+                  onClick={() => {
+                    pauseRecording();
+                    dispatch({ type: "PAUSE" });
+                  }}
                 >
                   <Pause className="h-4 w-4" />
                   暂停
@@ -580,7 +668,10 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 <Button
                   type="button"
                   variant="primary"
-                  onClick={() => dispatch({ type: "RESUME" })}
+                  onClick={() => {
+                    resumeRecording();
+                    dispatch({ type: "RESUME" });
+                  }}
                 >
                   <Play className="h-4 w-4" />
                   继续访谈
@@ -588,7 +679,11 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => dispatch({ type: "FINISH" })}
+                  onClick={() => {
+                    // 先收尾录音再走上传：否则麦克风会一直开着。
+                    stopRecording();
+                    dispatch({ type: "FINISH" });
+                  }}
                 >
                   结束并保存
                 </Button>
