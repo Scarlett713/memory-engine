@@ -79,40 +79,106 @@ const wizardSteps: Array<{ step: WizardStep; label: string }> = [
   { step: 3, label: "音频与提交" },
 ];
 
-function ConsentNotice({
+// 知情同意弹窗：创建项目的唯一闸口，用户点「我确认」之后才真正发起创建。
+// 不做任何本地记忆 —— 每次点「创建项目」都重新弹，并重置勾选态。
+function ConsentDialog({
+  open,
   checked,
-  onChange,
+  onCheckedChange,
+  onConfirm,
+  onCancel,
 }: {
+  open: boolean;
   checked: boolean;
-  onChange: (checked: boolean) => void;
+  onCheckedChange: (checked: boolean) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onCancel]);
+
+  if (!open) {
+    return null;
+  }
+
   return (
-    <div className="surface-card rounded-[1.55rem] border-2 border-emerald-500/40 p-4">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-5 w-5 text-emerald-600" />
-        <p className="section-eyebrow">知情同意确认</p>
+    <div className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]">
+      <div className="flex h-full flex-col items-center justify-center p-3 sm:p-5">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="consent-dialog-title"
+          className="paper-panel paper-panel-strong flex w-full max-w-xl flex-col rounded-[2rem] px-4 py-5 md:px-6 md:py-6"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+            <p className="section-eyebrow">知情同意确认</p>
+          </div>
+
+          <h2
+            id="consent-dialog-title"
+            className="font-display mt-2 text-[1.5rem] font-semibold text-accent-strong"
+          >
+            知情同意书
+          </h2>
+
+          <div className="soft-scroll mt-3 max-h-[min(55vh,24rem)] overflow-y-auto pr-2 text-sm leading-7 text-muted">
+            <p>
+              本平台会对本次口述音频进行本地转写、AI 整理与隐私脱敏处理，处理结果仅用于研究/归档目的。上传前，请确认您已向受访者完整说明上述用途。
+            </p>
+          </div>
+
+          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[1.15rem] border border-emerald-500/30 bg-white/60 p-3.5 text-sm leading-6 text-foreground">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 shrink-0 accent-emerald-600"
+              checked={checked}
+              onChange={(event) => onCheckedChange(event.target.checked)}
+            />
+            <span>
+              我确认已获得受访者的口头或书面知情同意，受访者已了解本次口述内容将被录音、转写、AI
+              整理，并同意在脱敏处理后用于研究/归档目的。
+            </span>
+          </label>
+
+          {!checked ? (
+            <p className="mt-2.5 text-xs leading-5 text-muted">
+              请先勾选知情同意确认，才能创建项目并开始处理。
+            </p>
+          ) : null}
+
+          <div className="mt-4 flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full justify-center sm:w-auto"
+              onClick={onCancel}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              className="w-full justify-center sm:w-auto sm:min-w-[140px]"
+              disabled={!checked}
+              onClick={onConfirm}
+            >
+              我确认
+            </Button>
+          </div>
+        </div>
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted">
-        本平台会对本次口述音频进行本地转写、AI 整理与隐私脱敏处理，处理结果仅用于研究 / 归档目的。上传前，请确认您已向受访者完整说明上述用途。
-        <span className="text-stone-400">（占位文案，待姚婷婷提供正式文案后替换）</span>
-      </p>
-      <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[1.15rem] border border-emerald-500/30 bg-white/60 p-3.5 text-sm leading-6 text-foreground">
-        <input
-          type="checkbox"
-          className="mt-1 h-4 w-4 shrink-0 accent-emerald-600"
-          checked={checked}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span>
-          我确认已获得受访者的口头或书面知情同意，受访者已了解本次口述内容将被录音、转写、AI
-          整理，并同意在脱敏处理后用于研究 / 归档目的。
-        </span>
-      </label>
-      {!checked ? (
-        <p className="mt-2.5 text-xs leading-5 text-muted">
-          请先勾选知情同意确认，才能上传并开始 AI 处理。
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -173,6 +239,8 @@ export function InterviewUploadForm() {
   const [language, setLanguage] = useState("cn");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
+  // 弹窗开关：Step 3 点「创建项目」时才开，关闭即作废，不落任何存储。
+  const [consentOpen, setConsentOpen] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -329,7 +397,18 @@ export function InterviewUploadForm() {
       return;
     }
 
+    // 每次创建都重新确认：先重置勾选态并弹窗，确认后才真正创建。
+    setConsentChecked(false);
+    setConsentOpen(true);
+  }
+
+  function handleConsentConfirm() {
+    setConsentOpen(false);
     void submitProject();
+  }
+
+  function handleConsentCancel() {
+    setConsentOpen(false);
   }
 
   // 认证状态未就绪 → 占位，避免首帧落到完整表单
@@ -710,7 +789,7 @@ export function InterviewUploadForm() {
             <>
               <div>
                 <label className="field-label" htmlFor="language">
-                  音频语言 / 方言
+                  音频语言/方言
                 </label>
                 <select
                   id="language"
@@ -725,11 +804,6 @@ export function InterviewUploadForm() {
                   ))}
                 </select>
               </div>
-
-              <ConsentNotice
-                checked={consentChecked}
-                onChange={setConsentChecked}
-              />
 
               <div className="surface-card flex flex-col rounded-[1.55rem] p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -818,7 +892,7 @@ export function InterviewUploadForm() {
               <Button
                 type="submit"
                 className="w-full justify-center sm:w-auto sm:min-w-[220px]"
-                disabled={isSubmitting || !consentChecked}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -836,6 +910,14 @@ export function InterviewUploadForm() {
           </div>
         </div>
       </form>
+
+      <ConsentDialog
+        open={consentOpen}
+        checked={consentChecked}
+        onCheckedChange={setConsentChecked}
+        onConfirm={handleConsentConfirm}
+        onCancel={handleConsentCancel}
+      />
     </section>
   );
 }
