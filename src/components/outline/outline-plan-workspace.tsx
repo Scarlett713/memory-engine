@@ -78,12 +78,19 @@ export function OutlinePlanWorkspace() {
   const [messages, setMessages] = useState<OutlineChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
+  const [isEnteringInterview, setIsEnteringInterview] = useState(false);
 
   // 记住上一次生成的原文，用来判断用户是不是手动改过。
   const lastGeneratedRef = useRef("");
   const canGenerate =
     Boolean(subject.trim() && topic.trim()) && !isGenerating && !isChatting;
   const canChat = Boolean(chatInput.trim()) && !isChatting && !isGenerating;
+  // AI 访谈建项目强制要提纲 + 项目名 + 受访对象（route 侧同样校验），三者齐了才放行。
+  const canEnterAiInterview =
+    Boolean(markdown.trim() && subject.trim() && topic.trim()) &&
+    !isEnteringInterview &&
+    !isGenerating &&
+    !isChatting;
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -283,6 +290,50 @@ export function OutlinePlanWorkspace() {
       notes: ethicsNotes.trim(),
     });
     router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
+  }
+
+  // D7=B：与「确认提纲，进入上传」并列的另一条链路，建一个尚无音频的项目后进访谈控制台。
+  // 不走 sessionStorage —— 提纲直接落进项目档案，控制台从服务端读。
+  async function handleEnterAiInterview() {
+    if (!canEnterAiInterview) {
+      return;
+    }
+
+    setIsEnteringInterview(true);
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/projects/ai-interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          projectName: topic.trim(),
+          intervieweeName: subject.trim(),
+          institutionName: institution.trim(),
+          researchFocus: researchFocus.trim(),
+          collectionScenario,
+          notes: ethicsNotes.trim(),
+          outlineDraftMarkdown: markdown,
+        }),
+      });
+
+      const payload = (await response
+        .json()
+        .catch(() => null)) as { project?: { id?: string }; message?: string } | null;
+      const projectId = payload?.project?.id;
+
+      if (!response.ok || !projectId) {
+        throw new Error(payload?.message ?? "创建项目失败");
+      }
+
+      // 访谈控制台页面由后续步骤实现，此处先照 PRD 跳过去。
+      router.push(`/projects/${projectId}/interview`);
+    } catch {
+      setNotice("创建项目失败，请重试");
+    } finally {
+      setIsEnteringInterview(false);
+    }
   }
 
   const scenarioHint =
@@ -611,6 +662,25 @@ export function OutlinePlanWorkspace() {
                 className="w-full sm:w-auto"
               >
                 跳过，直接上传
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleEnterAiInterview}
+                disabled={!canEnterAiInterview}
+                className="w-full sm:w-auto"
+              >
+                {isEnteringInterview ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    创建中…
+                  </>
+                ) : (
+                  <>
+                    <Bot className="h-4 w-4" />
+                    进入 AI 访谈
+                  </>
+                )}
               </Button>
               <Button
                 type="button"
