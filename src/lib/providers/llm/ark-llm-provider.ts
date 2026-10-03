@@ -375,8 +375,11 @@ export class ArkLlmProvider implements LlmProvider {
       "3. profile should merge the current known information and infer fields only when strongly supported by the conversation.",
       "4. outlineMarkdown must be a polished markdown outline with headings and bullet points, suitable for direct editing.",
       "5. The outline should cover interview goals, opening questions, deep-dive sections, emotion safety prompts, and on-site note reminders.",
+      "6. Every event listed in planning context events, and every entry in timePoints, must be covered by its own dedicated subsection or bullet. Do not merge them into one generic section.",
       "Current profile:",
       JSON.stringify(profile),
+      "Planning context (events / time points the outline must cover):",
+      JSON.stringify(input.planningContext ?? { events: [], timePoints: [] }),
       "Current outline draft:",
       input.currentOutline || "(empty)",
       "Conversation history:",
@@ -388,6 +391,8 @@ export class ArkLlmProvider implements LlmProvider {
 
     if (!parsed) {
       return {
+        // 这一支不抛异常，调用方只能靠 degraded 区分「模型没给出可用提纲」和「真的生成了」。
+        degraded: true,
         assistantMessage:
           "我先根据已有信息整理出一版可编辑提纲。你可以继续补充背景，我会继续细化。",
         readiness: input.currentOutline.trim() ? "drafting" : "collecting",

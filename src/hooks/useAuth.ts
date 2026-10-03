@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { OUTLINE_SESSION_STORAGE_KEY } from '@/lib/outline-session';
+import {
+  clearOutlineDraftFromSession,
+  OUTLINE_SESSION_STORAGE_KEY,
+} from '@/lib/outline-session';
 import type { UserProfile } from '@/types/user';
 
 interface AuthState {
@@ -33,6 +36,8 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem(OUTLINE_SESSION_STORAGE_KEY);
+    // 提纲草稿存在 sessionStorage，只清 localStorage 会把它留在共享机器的当前标签页里。
+    clearOutlineDraftFromSession();
     setState({ user: null, loading: false });
     window.location.href = '/login';
   }, []);

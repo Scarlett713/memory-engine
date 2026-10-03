@@ -1,7 +1,14 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AudioLines,
   Check,
@@ -13,6 +20,11 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  clearOutlineDraftFromSession,
+  OUTLINE_FLAG_PARAM,
+  readOutlineDraftFromSession,
+} from "@/lib/outline-session";
 import {
   collectionPathOptions,
   confidentialityLevelOptions,
@@ -47,6 +59,16 @@ const languageOptions = [
   { value: "cn_shanghai", label: "上海话" },
   { value: "cn_henanese", label: "河南话" },
 ];
+
+// 只在带标记位时读 sessionStorage。没有标记位一律返回空，
+// 保证直接进 /upload 不会被上一次的提纲串味。
+function readInitialOutlineDraft(hasOutlineFlag: boolean) {
+  if (!hasOutlineFlag || typeof window === "undefined") {
+    return "";
+  }
+
+  return readOutlineDraftFromSession();
+}
 
 type WizardStep = 1 | 2 | 3;
 
@@ -96,6 +118,7 @@ function ConsentNotice({
 
 export function InterviewUploadForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { loading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
@@ -113,7 +136,6 @@ export function InterviewUploadForm() {
   const [confidentialityLevel, setConfidentialityLevel] =
     useState<ConfidentialityLevel | null>(null);
   const [notes, setNotes] = useState("");
-  const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState("");
 
   // ── Step 1 高级设置 ──────────────────────────────────────
   const [institutionName, setInstitutionName] = useState("");
@@ -131,6 +153,27 @@ export function InterviewUploadForm() {
   const [consentChecked, setConsentChecked] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+
+  // 提纲草稿由 /projects/new/outline 带来：URL 只带 ?outline=1 标记位，全文在 sessionStorage。
+  // 读取放在惰性初始化里而不是 effect 里 —— 同步 setState 的 effect 会触发级联渲染（lint 会报）。
+  // 这个子树不会 SSR：useSearchParams 让它在最近的 Suspense 边界内退化成客户端渲染，
+  // 所以首帧就能拿到草稿；typeof window 守卫只是防它以后变成动态渲染。
+  const hasOutlineFlag = searchParams.get(OUTLINE_FLAG_PARAM) === "1";
+  const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState(() =>
+    readInitialOutlineDraft(hasOutlineFlag),
+  );
+  // 带草稿进来时默认展开折叠区，否则草稿藏在 <details> 里，用户会以为没预填。
+  const [outlineDetailsOpen, setOutlineDetailsOpen] = useState(
+    () => readInitialOutlineDraft(hasOutlineFlag).trim().length > 0,
+  );
+
+  useEffect(() => {
+    // 没有标记位就清掉残留草稿，避免上一次的提纲串进这次上传。
+    // 这里只写外部存储、不 setState，正是 effect 该干的事。
+    if (!hasOutlineFlag) {
+      clearOutlineDraftFromSession();
+    }
+  }, [hasOutlineFlag]);
 
   const helperText = useMemo(() => {
     if (!audioFile) {
@@ -241,6 +284,9 @@ export function InterviewUploadForm() {
         customRedactionRules,
         language,
       });
+
+      // 草稿已经进了项目档案，清掉 sessionStorage 里的副本，避免下次上传串味。
+      clearOutlineDraftFromSession();
 
       // 注意：这里不要加 router.refresh()——与 push 同 tick 调用会吞掉跳转
       router.push(`/projects/${project.id}?autostart=1`);
@@ -457,7 +503,13 @@ export function InterviewUploadForm() {
                 />
               </div>
 
-              <details className="surface-card rounded-[1.55rem] p-4">
+              <details
+                className="surface-card rounded-[1.55rem] p-4"
+                open={outlineDetailsOpen}
+                onToggle={(event) =>
+                  setOutlineDetailsOpen(event.currentTarget.open)
+                }
+              >
                 <summary className="cursor-pointer text-sm font-semibold text-foreground">
                   访谈提纲（选填）
                 </summary>

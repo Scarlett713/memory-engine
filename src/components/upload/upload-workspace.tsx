@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -37,7 +38,17 @@ export function UploadWorkspace() {
         </header>
 
         <section className="min-w-0 xl:min-h-0">
-          <InterviewUploadForm />
+          {/* InterviewUploadForm 里用了 useSearchParams 读提纲标记位。
+              静态预渲染路由下这是 CSR bailout，没有祖先 Suspense 会直接让 build 失败。 */}
+          <Suspense
+            fallback={
+              <div className="surface-card rounded-[1.55rem] p-5 text-sm text-muted">
+                正在加载表单…
+              </div>
+            }
+          >
+            <InterviewUploadForm />
+          </Suspense>
         </section>
       </div>
     </main>

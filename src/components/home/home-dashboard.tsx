@@ -44,11 +44,12 @@ export function HomeDashboard() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:min-w-[420px] xl:justify-end">
               {/* 徽标槽位的固定占位。useAuth 的 user 是组件内 state，客户端跳转回首页时
                   组件重新挂载 —— user 先是 null（徽标不渲染），/api/auth/me 到货后才插进来，
-                  header 被撑高，下方列表跟着下跳。375px 下这一列的堆叠高度直接决定 header
-                  高度：徽标 47px + 外层 gap-3 的 12px = 59px，就是跳变量。
-                  min-h 取 47（徽标的实测高度）而非 59：有徽标时 max(47, 47) 不生长，
-                  375px 的 header 保持原高；≥640px 槽位已被 CTA 撑到 54px，47 ≤ 54 同样
-                  不生长。全断点中性，只补上没有徽标时的空缺。 */}
+                  header 被撑高，下方列表跟着下跳。跳变量恒为 47px（徽标实测高度）+ 外层 gap-3
+                  的 12px = 59px，与这一列里已排了几个 CTA 无关。
+                  本列现在是「槽位 / 新建访谈项目 / 新建访谈（含提纲生成）」三项：两个 CTA
+                  都不依赖异步数据、首帧即渲染，因此不参与占位 —— 只有槽位常驻 47px 才抵得掉
+                  那 59px。min-h 取 47 而非 59：有徽标时 max(47, 47) 不生长，375px 的 header
+                  保持原高；≥640px 槽位已被 CTA 撑到 54px，47 ≤ 54 同样不生长。全断点中性。 */}
               <div className="min-h-[47px]">
                 {user ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 sm:justify-start">
@@ -73,6 +74,14 @@ export function HomeDashboard() {
                   </div>
                 ) : null}
               </div>
+
+              <Link
+                href="/projects/new/outline"
+                className="sidebar-secondary w-full px-5 sm:w-auto"
+              >
+                <Plus className="h-4 w-4" />
+                新建访谈（含提纲生成）
+              </Link>
 
               <Link href="/upload" className="sidebar-cta w-full px-5 sm:w-auto">
                 <Plus className="h-4 w-4" />

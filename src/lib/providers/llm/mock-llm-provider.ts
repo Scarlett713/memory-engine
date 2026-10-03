@@ -1,5 +1,8 @@
 import { getInterviewScenarioLabel } from "@/lib/oral-history";
-import { normalizeOutlineProfile } from "@/lib/outline-session";
+import {
+  normalizeOutlinePlanningContext,
+  normalizeOutlineProfile,
+} from "@/lib/outline-session";
 import type {
   LlmAskResult,
   LlmOutlineChatInput,
@@ -7,7 +10,41 @@ import type {
   LlmRefineInput,
   LlmRefineResult,
 } from "@/lib/providers/llm/types";
-import type { OutlineChatResult } from "@/lib/types/outline";
+import type {
+  OutlineChatResult,
+  OutlinePlanningContext,
+} from "@/lib/types/outline";
+
+// 把「重大事件 / 时间节点」摊成独立分节。
+// 没有规划上下文时返回空数组，保证不带事件的输出与加这个功能之前逐字节一致。
+function buildPlanningSections(
+  planningContext?: OutlinePlanningContext,
+): string[] {
+  const { events, timePoints } = normalizeOutlinePlanningContext(planningContext);
+  const lines: string[] = [];
+
+  if (events.length) {
+    lines.push("## 重大事件脉络", "");
+
+    for (const event of events) {
+      lines.push(`### ${event}`);
+      lines.push(`- 请围绕“${event}”还原当时的时间、地点、在场人物与您的处境。`);
+      lines.push("- 这件事之后，您的生活、家庭或工作发生了哪些变化？", "");
+    }
+  }
+
+  if (timePoints.length) {
+    lines.push("## 时间节点", "");
+
+    for (const timePoint of timePoints) {
+      lines.push(`- ${timePoint}：确认当时的主要经历、人物关系与情绪状态。`);
+    }
+
+    lines.push("");
+  }
+
+  return lines;
+}
 
 function buildOutlineMarkdown(input: LlmOutlineChatInput) {
   const profile = normalizeOutlineProfile(input.profile);
@@ -30,6 +67,7 @@ function buildOutlineMarkdown(input: LlmOutlineChatInput) {
     "2. 补充时间、地点、人物关系和场景细节，便于后续结构化整理。",
     "3. 关注情绪波动区段，保证提问节奏平稳、尊重受访者感受。",
     "",
+    ...buildPlanningSections(input.planningContext),
     "## 核心提问路径",
     "### 第一阶段：进入记忆",
     `- 请您先介绍一下自己与这次口述主题“${focus}”之间最直接的关联。`,

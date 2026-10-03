@@ -6,6 +6,7 @@ import type {
 import type {
   OutlineChatMessage,
   OutlineChatResult,
+  OutlinePlanningContext,
   OutlineProjectProfile,
 } from "@/lib/types/outline";
 
@@ -59,6 +60,8 @@ export type LlmOutlineChatInput = {
   messages: OutlineChatMessage[];
   profile: OutlineProjectProfile;
   currentOutline: string;
+  // 单次生成（/api/outline/generate）用，对话式调用可以不传。
+  planningContext?: OutlinePlanningContext;
 };
 
 export type LlmAskResult = {
