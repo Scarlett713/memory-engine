@@ -579,7 +579,7 @@ a {
   }
 }
 
-/* 手机端（<768px，与 Tailwind md 断点、useDeviceType 默认断点一致） */
+/* xl 以下（<1280px）：触屏与窄屏降级规则 */
 @media (max-width: 1279px) {
   /* 中文标签在宽字距下浪费大量横向空间 */
   .section-eyebrow {
