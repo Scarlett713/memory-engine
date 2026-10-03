@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   ArrowUpRight,
   Clock3,
@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  HOME_SCROLL_STORAGE_KEY,
+  useScrollRestoration,
+} from "@/hooks/useScrollRestoration";
 import type { ProjectRecord } from "@/lib/types/project";
 import { formatDateTime } from "@/lib/utils";
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
@@ -33,6 +37,16 @@ export function RecentProjectList({
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // 记住首页列表的滚动位置，从项目详情页返回时恢复。
+  // ready 跟 isLoading 走：加载占位块插在卡片上方会整体下移列表，等它落定再钳位恢复。
+  useScrollRestoration(scrollContainerRef, {
+    storageKey: HOME_SCROLL_STORAGE_KEY,
+    persistPath: "/",
+    ready: !isLoading,
+  });
 
   function handleDelete(projectId: string) {
     if (!window.confirm("确定要删除该项目吗？此操作不可恢复。")) return;
@@ -77,7 +91,10 @@ export function RecentProjectList({
         </div>
       ) : null}
 
-      <div className="soft-scroll mt-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto">
+      <div
+        ref={scrollContainerRef}
+        className="soft-scroll mt-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto"
+      >
         <div className="space-y-3">
           {isLoading ? (
             <div className="surface-card rounded-[1.4rem] p-5 text-sm text-muted">

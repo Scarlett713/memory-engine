@@ -16,7 +16,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    // data-scroll-behavior 告知 Next 路由切换时临时关掉平滑滚动：globals.css 里
+    // html { scroll-behavior: smooth } 会让路由回顶变成一段可见的滑动，且会触发 dev 警告。
+    <html lang="zh-CN" data-scroll-behavior="smooth">
       <body>{children}</body>
     </html>
   );
