@@ -14,6 +14,12 @@ export function getProjectsFilePath() {
   return path.join(getStorageRoot(), "projects.json");
 }
 
+// 账号文件与项目库同根：部署时只挂一个卷就够（此前它硬编码在 ./data，
+// 挂载点漏了它会出现「登录不上但项目还在」的半损状态）。
+export function getUsersFilePath() {
+  return path.join(getStorageRoot(), "users.json");
+}
+
 export async function ensureStorageLayout() {
   const storageRoot = getStorageRoot();
   const uploadsDirectory = getUploadsDirectory();

@@ -1,5 +1,4 @@
 import fs from 'fs/promises';
-import path from 'path';
 import { nanoid } from 'nanoid';
 import type { User, RegisterRequest, UserProfile } from '@/types/user';
 import { hashPassword } from '@/lib/auth';
@@ -9,13 +8,10 @@ import {
   runExclusive,
   writeJsonAtomic,
 } from '@/lib/server/json-store';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-
-async function ensureDataDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-}
+import {
+  ensureStorageLayout,
+  getUsersFilePath,
+} from '@/lib/server/storage';
 
 /**
  * 读侧不再覆盖写。
@@ -23,9 +19,11 @@ async function ensureDataDir() {
  * 整个账号文件清空 —— 这里只在文件确实缺失时创建，损坏时留隔离副本。
  */
 async function readUsers(): Promise<User[]> {
-  await ensureDataDir();
+  // 与项目库共用 storage 目录：路径由 LOCAL_STORAGE_DIR 决定，不在这里拼。
+  await ensureStorageLayout();
 
-  const result = await readJsonFile<User[]>(USERS_FILE);
+  const usersFilePath = getUsersFilePath();
+  const result = await readJsonFile<User[]>(usersFilePath);
 
   if (result.status === 'ok') {
     return Array.isArray(result.data) ? result.data : [];
@@ -34,7 +32,7 @@ async function readUsers(): Promise<User[]> {
   if (result.status === 'missing') {
     try {
       // wx = 独占创建，两个并发首启动只有一个能建成
-      await fs.writeFile(USERS_FILE, '[]', { encoding: 'utf-8', flag: 'wx' });
+      await fs.writeFile(usersFilePath, '[]', { encoding: 'utf-8', flag: 'wx' });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error;
@@ -44,13 +42,13 @@ async function readUsers(): Promise<User[]> {
     return [];
   }
 
-  await quarantineFile(USERS_FILE);
+  await quarantineFile(usersFilePath);
   return [];
 }
 
 async function writeUsers(users: User[]): Promise<void> {
-  await ensureDataDir();
-  await writeJsonAtomic(USERS_FILE, users);
+  await ensureStorageLayout();
+  await writeJsonAtomic(getUsersFilePath(), users);
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
@@ -65,7 +63,7 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function createUser(data: RegisterRequest): Promise<UserProfile> {
   // 锁包住 read → 查重 → 追加 → write：否则两个并发注册同邮箱会双双通过查重。
-  return runExclusive(USERS_FILE, async () => {
+  return runExclusive(getUsersFilePath(), async () => {
     const users = await readUsers();
 
     const exists = users.some(
@@ -91,7 +89,7 @@ export async function createUser(data: RegisterRequest): Promise<UserProfile> {
 }
 
 export async function updateLastLogin(userId: string): Promise<void> {
-  await runExclusive(USERS_FILE, async () => {
+  await runExclusive(getUsersFilePath(), async () => {
     const users = await readUsers();
     const index = users.findIndex((u) => u.id === userId);
     if (index !== -1) {
