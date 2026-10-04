@@ -13,10 +13,8 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 
-import { StringListField } from "@/components/outline/string-list-field";
 import { Button } from "@/components/ui/button";
 import { MarkdownSheet } from "@/components/ui/markdown-sheet";
-import { interviewScenarioOptions } from "@/lib/oral-history";
 import {
   OUTLINE_FLAG_PARAM,
   saveOutlineDraftToSession,
@@ -27,6 +25,15 @@ import type { InterviewScenario } from "@/lib/types/project";
 const MESSAGE_MAX_LENGTH = 1000;
 // 与 route 的 MESSAGE_HISTORY_LIMIT 对齐：历史只留最近 10 条。
 const MESSAGE_HISTORY_LIMIT = 10;
+
+/**
+ * UI-12：机构 / 采集场景 / 研究焦点 / 重大事件 / 时间节点 / 伦理备注六项已合并进
+ * 「访谈内容概述」自由文本框，前端不再采集。这些 key 在请求契约里仍然存在，
+ * 故按 PRD §4 发默认值占位（不删 key，不触数据层冻结面）。
+ */
+const DEFAULT_COLLECTION_SCENARIO: InterviewScenario = "urban_memory";
+// 与服务端 NOTES_MAX_LENGTH 对齐。
+const OVERVIEW_MAX_LENGTH = 1000;
 
 type OutlineGenerateResponse = {
   markdown?: string;
@@ -63,13 +70,9 @@ export function OutlinePlanWorkspace() {
 
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [researchFocus, setResearchFocus] = useState("");
-  const [collectionScenario, setCollectionScenario] =
-    useState<InterviewScenario>("urban_memory");
-  const [events, setEvents] = useState<string[]>([""]);
-  const [timePoints, setTimePoints] = useState<string[]>([""]);
-  const [ethicsNotes, setEthicsNotes] = useState("");
+  // UI-12：六个被合并字段共用这一个自由文本框，提交时双写进
+  // researchFocus 与 ethicsNotes / notes（见 PRD §4 决策记录）。
+  const [overview, setOverview] = useState("");
 
   const [markdown, setMarkdown] = useState("");
   const [notice, setNotice] = useState("");
@@ -143,12 +146,13 @@ export function OutlinePlanWorkspace() {
         body: JSON.stringify({
           subject: subject.trim(),
           topic: topic.trim(),
-          institution: institution.trim(),
-          researchFocus: researchFocus.trim(),
-          collectionScenario,
-          events: events.map((item) => item.trim()).filter(Boolean),
-          timePoints: timePoints.map((item) => item.trim()).filter(Boolean),
-          ethicsNotes: ethicsNotes.trim(),
+          institution: "",
+          // 双写：契约里没有能同时承载「人物背景 + 访谈内容 + 主要事件」的字段。
+          researchFocus: overview.trim(),
+          collectionScenario: DEFAULT_COLLECTION_SCENARIO,
+          events: [],
+          timePoints: [],
+          ethicsNotes: overview.trim(),
         }),
       });
 
@@ -208,12 +212,13 @@ export function OutlinePlanWorkspace() {
           currentOutline: markdown,
           subject: subject.trim(),
           topic: topic.trim(),
-          institution: institution.trim(),
-          researchFocus: researchFocus.trim(),
-          collectionScenario,
-          events: events.map((item) => item.trim()).filter(Boolean),
-          timePoints: timePoints.map((item) => item.trim()).filter(Boolean),
-          ethicsNotes: ethicsNotes.trim(),
+          institution: "",
+          // 同 handleGenerate：双写。重建提纲时自由文本继续作为画像喂给模型。
+          researchFocus: overview.trim(),
+          collectionScenario: DEFAULT_COLLECTION_SCENARIO,
+          events: [],
+          timePoints: [],
+          ethicsNotes: overview.trim(),
         }),
       });
 
@@ -273,10 +278,10 @@ export function OutlinePlanWorkspace() {
     saveOutlineDraftToSession(markdown, {
       projectName: topic.trim(),
       intervieweeName: subject.trim(),
-      institutionName: institution.trim(),
-      collectionScenario,
-      researchFocus: researchFocus.trim(),
-      notes: ethicsNotes.trim(),
+      institutionName: "",
+      collectionScenario: DEFAULT_COLLECTION_SCENARIO,
+      researchFocus: overview.trim(),
+      notes: overview.trim(),
     });
     router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
   }
@@ -287,10 +292,10 @@ export function OutlinePlanWorkspace() {
     saveOutlineDraftToSession("", {
       projectName: topic.trim(),
       intervieweeName: subject.trim(),
-      institutionName: institution.trim(),
-      collectionScenario,
-      researchFocus: researchFocus.trim(),
-      notes: ethicsNotes.trim(),
+      institutionName: "",
+      collectionScenario: DEFAULT_COLLECTION_SCENARIO,
+      researchFocus: overview.trim(),
+      notes: overview.trim(),
     });
     router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
   }
@@ -313,10 +318,11 @@ export function OutlinePlanWorkspace() {
         body: JSON.stringify({
           projectName: topic.trim(),
           intervieweeName: subject.trim(),
-          institutionName: institution.trim(),
-          researchFocus: researchFocus.trim(),
-          collectionScenario,
-          notes: ethicsNotes.trim(),
+          institutionName: "",
+          // AI 访谈 route 不截断，自由文本全文入档。
+          researchFocus: overview.trim(),
+          collectionScenario: DEFAULT_COLLECTION_SCENARIO,
+          notes: overview.trim(),
           outlineDraftMarkdown: markdown,
         }),
       });
@@ -338,10 +344,6 @@ export function OutlinePlanWorkspace() {
       setIsEnteringInterview(false);
     }
   }
-
-  const scenarioHint =
-    interviewScenarioOptions.find((option) => option.value === collectionScenario)
-      ?.description ?? "";
 
   return (
     <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5">
@@ -391,21 +393,8 @@ export function OutlinePlanWorkspace() {
                 <div className="tape-label">Profile</div>
               </div>
 
+              {/* UI-12：单卡三控件，顺序固定为 主题 → 姓名 → 内容概述（对齐 REQ-21）。 */}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="field-label" htmlFor="outline-subject">
-                    受访者姓名
-                    <span className="ml-1 text-red-500">*</span>
-                  </label>
-                  <input
-                    id="outline-subject"
-                    className="text-field"
-                    value={subject}
-                    onChange={(event) => setSubject(event.target.value)}
-                    placeholder="例如：陈秀兰"
-                  />
-                </div>
-
                 <div>
                   <label className="field-label" htmlFor="outline-topic">
                     访谈主题
@@ -421,97 +410,30 @@ export function OutlinePlanWorkspace() {
                 </div>
 
                 <div>
-                  <label className="field-label" htmlFor="outline-institution">
-                    机构 / 单位
+                  <label className="field-label" htmlFor="outline-subject">
+                    访谈对象姓名
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <input
-                    id="outline-institution"
+                    id="outline-subject"
                     className="text-field"
-                    value={institution}
-                    onChange={(event) => setInstitution(event.target.value)}
-                    placeholder="例如：黄浦区档案馆"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="例如：陈秀兰"
                   />
-                </div>
-
-                <div>
-                  <label className="field-label" htmlFor="outline-scenario">
-                    采集场景
-                  </label>
-                  <select
-                    id="outline-scenario"
-                    className="text-field"
-                    value={collectionScenario}
-                    onChange={(event) =>
-                      setCollectionScenario(event.target.value as InterviewScenario)
-                    }
-                  >
-                    {interviewScenarioOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="field-label" htmlFor="outline-focus">
-                    研究焦点
-                  </label>
-                  <input
-                    id="outline-focus"
-                    className="text-field"
-                    value={researchFocus}
-                    onChange={(event) => setResearchFocus(event.target.value)}
-                    placeholder="例如：搬迁前后家庭关系与邻里网络的变化"
-                  />
-                </div>
-              </div>
-
-              {scenarioHint ? (
-                <p className="mt-3 text-xs leading-5 text-muted">{scenarioHint}</p>
-              ) : null}
-            </div>
-
-            <div className="surface-card rounded-[1.55rem] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="section-eyebrow">事件与时间节点</p>
-                  <h2 className="mt-1.5 text-base font-semibold text-foreground">
-                    让提纲围绕具体经历展开
-                  </h2>
-                </div>
-                <div className="tape-label">Timeline</div>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-4">
-                <StringListField
-                  id="outline-event"
-                  label="重大事件"
-                  values={events}
-                  placeholder="例如：1985 年全家搬离老城厢"
-                  addLabel="添加事件"
-                  onChange={setEvents}
-                />
-
-                <StringListField
-                  id="outline-timepoint"
-                  label="时间节点"
-                  values={timePoints}
-                  placeholder="例如：1992 年下岗转做个体经营"
-                  addLabel="添加时间节点"
-                  onChange={setTimePoints}
-                />
-
-                <div>
-                  <label className="field-label" htmlFor="outline-ethics">
-                    伦理备注
+                  <label className="field-label" htmlFor="outline-overview">
+                    访谈内容概述
                   </label>
                   <textarea
-                    id="outline-ethics"
+                    id="outline-overview"
                     className="text-area min-h-[7rem]"
-                    value={ethicsNotes}
-                    onChange={(event) => setEthicsNotes(event.target.value)}
-                    placeholder="例如：涉及已故亲属，需放慢节奏；受访者要求隐去具体门牌号。"
+                    value={overview}
+                    onChange={(event) => setOverview(event.target.value)}
+                    maxLength={OVERVIEW_MAX_LENGTH}
+                    placeholder="介绍受访者的人物背景、本次访谈的主要内容与主要事件。例如：受访者 1940 年生，1992 年下岗后经营裁缝铺；本次主要访谈老城厢搬迁前后的邻里记忆。"
                   />
                 </div>
               </div>
