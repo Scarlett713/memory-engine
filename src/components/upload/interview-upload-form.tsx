@@ -199,7 +199,11 @@ export function InterviewUploadForm() {
   const hasOutlineFlag = searchParams.get(OUTLINE_FLAG_PARAM) === "1";
   const [prefill] = useState(() => readInitialOutlineDraft(hasOutlineFlag));
 
-  const [step, setStep] = useState<WizardStep>(1);
+  // REQ-21 §5.2：基本信息已由新建流程写入草稿的 projectName / intervieweeName，
+  // 两项齐了就直接从步骤二开始，不再要求重复填写。缺任一则维持从步骤一开始。
+  const [step, setStep] = useState<WizardStep>(() =>
+    prefill?.profile.projectName && prefill?.profile.intervieweeName ? 2 : 1,
+  );
 
   // ── Step 1 基础信息 ──────────────────────────────────────
   const [projectName, setProjectName] = useState(

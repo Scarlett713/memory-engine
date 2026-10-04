@@ -87,16 +87,20 @@ type OutlinePlanWorkspaceProps = {
    * 无论是否提供，草稿都照常写 sessionStorage（分流步的提纲判定与上传页预填都靠它）。
    */
   onContinue?: (result: { skipped: boolean }) => void;
+  initialTopic?: string;
+  initialSubject?: string;
 };
 
 export function OutlinePlanWorkspace({
   embedded = false,
   onContinue,
+  initialTopic,
+  initialSubject,
 }: OutlinePlanWorkspaceProps = {}) {
   const router = useRouter();
 
-  const [subject, setSubject] = useState("");
-  const [topic, setTopic] = useState("");
+  const [subject, setSubject] = useState(initialSubject ?? "");
+  const [topic, setTopic] = useState(initialTopic ?? "");
   // UI-12：六个被合并字段共用这一个自由文本框，提交时双写进
   // researchFocus 与 ethicsNotes / notes（见 PRD §4 决策记录）。
   const [overview, setOverview] = useState("");

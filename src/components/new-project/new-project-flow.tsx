@@ -11,6 +11,10 @@ import {
 } from "@/components/new-project/basic-info-form";
 import { RouteChooser } from "@/components/new-project/route-chooser";
 import { OutlinePlanWorkspace } from "@/components/outline/outline-plan-workspace";
+import {
+  readOutlineDraftSession,
+  saveOutlineDraftToSession,
+} from "@/lib/outline-session";
 
 // 步骤 key 同时是 URL 的 step 值与 #new-step-* 锚点后缀（IMPL §3.3）。
 const NEW_PROJECT_STEPS = [
@@ -51,6 +55,24 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
   function goToStep(next: NewProjectStep) {
     setStep(next);
     router.replace(`/projects/new?step=${next}`);
+  }
+
+  // REQ-21 §5.2：基本信息不是「只活在 React state」，点下一步时写进既有草稿。
+  //
+  // 必须先读再 merge：saveOutlineDraftToSession 是整体覆盖（outline-session.ts:155-161
+  // 从 createEmptyOutlineSession() 起重建，messages 一并清零），直写会把提纲步
+  // 已生成的对话与 institutionName / collectionScenario / researchFocus 全部抹掉。
+  // 本仓库禁止扩展 src/lib/**（IMPL §7.1.3），所以 merge 只能在这层做。
+  function persistBasicInfo(next: BasicInfo) {
+    const existing = readOutlineDraftSession();
+
+    saveOutlineDraftToSession(existing?.outlineMarkdown ?? "", {
+      ...existing?.profile,
+      projectName: next.projectName.trim(),
+      intervieweeName: next.intervieweeName.trim(),
+      // IMPL §3.3 裁决：描述信息 → notes；researchFocus 不由基本信息写入。
+      notes: next.overview.trim(),
+    });
   }
 
   return (
@@ -121,7 +143,10 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
               <BasicInfoForm
                 value={basicInfo}
                 onChange={setBasicInfo}
-                onNext={() => goToStep("outline")}
+                onNext={() => {
+                  persistBasicInfo(basicInfo);
+                  goToStep("outline");
+                }}
               />
             </div>
           ) : null}
@@ -135,7 +160,15 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
                   onContinue 取代它内部的 router.push，把「下一步」交给本容器。 */}
               <OutlinePlanWorkspace
                 embedded
-                onContinue={() => goToStep("route")}
+                initialTopic={basicInfo.projectName}
+                initialSubject={basicInfo.intervieweeName}
+                onContinue={() => {
+                  // workspace 的「确认 / 跳过」会用提纲表单的字段整体覆盖草稿
+                  // （saveOutlineDraftToSession 是重建而非 merge），这里把基本信息的
+                  // 三个字段写回去；markdown 与画像其余字段保持 workspace 刚写下的值。
+                  persistBasicInfo(basicInfo);
+                  goToStep("route");
+                }}
               />
             </div>
           ) : null}

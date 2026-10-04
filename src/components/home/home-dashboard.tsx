@@ -93,7 +93,7 @@ export function HomeDashboard() {
             {/* 首页唯一的新建入口。REQ-16 之前 header 里有两个 CTA（/projects/new/outline
                 与 /upload），现收敛为这一个；/upload 降级为非首页入口，仅由提纲链路跳入。 */}
             <Link
-              href="/projects/new/outline"
+              href="/projects/new"
               className="sidebar-cta mt-auto w-full px-5"
             >
               <Plus className="h-4 w-4" />
