@@ -346,8 +346,8 @@ export function OutlinePlanWorkspace() {
   }
 
   return (
-    <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="flex flex-col gap-2">
+    <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5 xl:h-dvh xl:overflow-hidden">
+      <div className="flex flex-col gap-2 xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]">
         <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5">
           {/* 返回链接的位置与 class 与上传页、项目详情页保持逐字节一致，
               别改回右侧槽位的按钮样式 —— 三处要看起来是同一个控件。 */}
@@ -377,9 +377,9 @@ export function OutlinePlanWorkspace() {
           </div>
         </header>
 
-        <div className="grid min-w-0 gap-2 lg:grid-cols-2">
-          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5">
-            <div className="surface-card rounded-[1.55rem] p-4">
+        <div className="grid min-w-0 gap-2 lg:grid-cols-2 xl:min-h-0">
+          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+            <div className="surface-card flex min-h-0 flex-1 flex-col rounded-[1.55rem] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="section-eyebrow">
@@ -394,7 +394,9 @@ export function OutlinePlanWorkspace() {
               </div>
 
               {/* UI-12：单卡三控件，顺序固定为 主题 → 姓名 → 内容概述（对齐 REQ-21）。 */}
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {/* md:grid-rows-[auto_1fr]：第二行（内容概述）吸收卡片剩余高度，
+                  <768px 单列文档流不受影响。 */}
+              <div className="mt-4 grid min-h-0 flex-1 gap-4 md:grid-cols-2 md:grid-rows-[auto_1fr]">
                 <div>
                   <label className="field-label" htmlFor="outline-topic">
                     访谈主题
@@ -423,13 +425,13 @@ export function OutlinePlanWorkspace() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="flex min-h-0 flex-col md:col-span-2">
                   <label className="field-label" htmlFor="outline-overview">
                     访谈内容概述
                   </label>
                   <textarea
                     id="outline-overview"
-                    className="text-area min-h-[7rem]"
+                    className="text-area min-h-[7rem] flex-1 max-h-[20rem]"
                     value={overview}
                     onChange={(event) => setOverview(event.target.value)}
                     maxLength={OVERVIEW_MAX_LENGTH}
@@ -459,154 +461,156 @@ export function OutlinePlanWorkspace() {
             </div>
           </section>
 
-          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="section-eyebrow">提纲编辑</p>
-                <h2 className="mt-1.5 text-base font-semibold text-foreground">
-                  Markdown 草稿
-                </h2>
-              </div>
-              <div className="tape-label">Editable</div>
-            </div>
-
-            {notice ? (
-              <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
-                {notice}
-              </div>
-            ) : null}
-
-            {markdown ? (
-              <>
-                {/* 切换 tab 只在有提纲时出现 —— 空态露出来会指向不存在的可切换内容。 */}
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant={isPreviewMode ? "secondary" : "ghost"}
-                    className="min-h-9 px-4 py-1.5"
-                    onClick={() => setIsPreviewMode(true)}
-                  >
-                    预览
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={isPreviewMode ? "ghost" : "secondary"}
-                    className="min-h-9 px-4 py-1.5"
-                    onClick={() => setIsPreviewMode(false)}
-                  >
-                    编辑
-                  </Button>
+          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+            <div className="soft-scroll flex min-h-0 flex-col gap-4 xl:flex-1 xl:overflow-y-auto xl:overflow-x-hidden xl:pr-1">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="section-eyebrow">提纲编辑</p>
+                  <h2 className="mt-1.5 text-base font-semibold text-foreground">
+                    Markdown 草稿
+                  </h2>
                 </div>
+                <div className="tape-label">Editable</div>
+              </div>
 
-                {/* 两种模式共用同一块最小高度，切换时面板不跳。 */}
-                {isPreviewMode ? (
-                  <div className="soft-scroll min-h-[24rem] flex-1 overflow-auto rounded-[1.1rem] border border-line/60 bg-white/60 p-4">
-                    <MarkdownSheet markdown={markdown} />
+              {notice ? (
+                <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
+                  {notice}
+                </div>
+              ) : null}
+
+              {markdown ? (
+                <>
+                  {/* 切换 tab 只在有提纲时出现 —— 空态露出来会指向不存在的可切换内容。 */}
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant={isPreviewMode ? "secondary" : "ghost"}
+                      className="min-h-9 px-4 py-1.5"
+                      onClick={() => setIsPreviewMode(true)}
+                    >
+                      预览
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={isPreviewMode ? "ghost" : "secondary"}
+                      className="min-h-9 px-4 py-1.5"
+                      onClick={() => setIsPreviewMode(false)}
+                    >
+                      编辑
+                    </Button>
                   </div>
-                ) : (
-                  <textarea
-                    className="text-area min-h-[24rem] flex-1"
-                    value={markdown}
-                    onChange={(event) => setMarkdown(event.target.value)}
-                    aria-label="访谈提纲草稿"
-                  />
-                )}
-              </>
-            ) : (
-              <div className="surface-card flex min-h-[24rem] flex-1 items-center justify-center rounded-[1.55rem] px-4 py-4 text-sm leading-6 text-muted">
-                {isGenerating ? "正在生成提纲…" : "填写左侧信息后点击生成"}
-              </div>
-            )}
 
-            {markdown ? (
-              <div className="surface-card flex flex-col gap-3 rounded-[1.55rem] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="section-eyebrow">多轮对话细化</p>
-                  {messages.length ? (
-                    <span className="text-xs text-muted">
-                      {messages.length} 条记录
-                    </span>
-                  ) : null}
+                  {/* 两种模式共用同一块最小高度，切换时面板不跳。 */}
+                  {isPreviewMode ? (
+                    <div className="soft-scroll min-h-[24rem] flex-1 overflow-auto rounded-[1.1rem] border border-line/60 bg-white/60 p-4">
+                      <MarkdownSheet markdown={markdown} />
+                    </div>
+                  ) : (
+                    <textarea
+                      className="text-area min-h-[24rem] flex-1"
+                      value={markdown}
+                      onChange={(event) => setMarkdown(event.target.value)}
+                      aria-label="访谈提纲草稿"
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="surface-card flex min-h-[24rem] flex-1 items-center justify-center rounded-[1.55rem] px-4 py-4 text-sm leading-6 text-muted">
+                  {isGenerating ? "正在生成提纲…" : "填写左侧信息后点击生成"}
                 </div>
+              )}
 
-                {messages.length ? (
-                  <div className="soft-scroll flex max-h-48 flex-col gap-3 overflow-y-auto pr-1">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`chat-row ${
-                          message.role === "user"
-                            ? "justify-end"
-                            : "justify-start"
-                        }`}
-                      >
+              {markdown ? (
+                <div className="surface-card flex flex-col gap-3 rounded-[1.55rem] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="section-eyebrow">多轮对话细化</p>
+                    {messages.length ? (
+                      <span className="text-xs text-muted">
+                        {messages.length} 条记录
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {messages.length ? (
+                    <div className="soft-scroll flex max-h-48 flex-col gap-3 overflow-y-auto pr-1">
+                      {messages.map((message) => (
                         <div
-                          className={`chat-bubble ${
+                          key={message.id}
+                          className={`chat-row ${
                             message.role === "user"
-                              ? "chat-bubble-user"
-                              : "chat-bubble-assistant"
+                              ? "justify-end"
+                              : "justify-start"
                           }`}
                         >
-                          <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.12em] opacity-80">
-                            {message.role === "assistant" ? (
-                              <>
-                                <Bot className="h-3.5 w-3.5" />
-                                提纲助手
-                              </>
-                            ) : (
-                              <>
-                                <NotebookPen className="h-3.5 w-3.5" />
-                                研究者
-                              </>
-                            )}
+                          <div
+                            className={`chat-bubble ${
+                              message.role === "user"
+                                ? "chat-bubble-user"
+                                : "chat-bubble-assistant"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.12em] opacity-80">
+                              {message.role === "assistant" ? (
+                                <>
+                                  <Bot className="h-3.5 w-3.5" />
+                                  提纲助手
+                                </>
+                              ) : (
+                                <>
+                                  <NotebookPen className="h-3.5 w-3.5" />
+                                  研究者
+                                </>
+                              )}
+                            </div>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
+                              {message.content}
+                            </p>
                           </div>
-                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
-                            {message.content}
-                          </p>
                         </div>
-                      </div>
-                    ))}
-                    <div ref={chatBottomRef} />
+                      ))}
+                      <div ref={chatBottomRef} />
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-6 text-muted">
+                      生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
+                    </p>
+                  )}
+
+                  <textarea
+                    className="text-area min-h-22"
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={handleChatKeyDown}
+                    disabled={isChatting || isGenerating}
+                    maxLength={MESSAGE_MAX_LENGTH}
+                    placeholder="例如：把开场问题改得更生活化"
+                    aria-label="提纲修改说明"
+                  />
+
+                  <div className="flex items-center justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => void handleChat()}
+                      disabled={!canChat}
+                      className="w-full sm:w-auto"
+                    >
+                      {isChatting ? (
+                        <>
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                          修改中…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          发送修改
+                        </>
+                      )}
+                    </Button>
                   </div>
-                ) : (
-                  <p className="text-sm leading-6 text-muted">
-                    生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
-                  </p>
-                )}
-
-                <textarea
-                  className="text-area min-h-22"
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  onKeyDown={handleChatKeyDown}
-                  disabled={isChatting || isGenerating}
-                  maxLength={MESSAGE_MAX_LENGTH}
-                  placeholder="例如：把开场问题改得更生活化"
-                  aria-label="提纲修改说明"
-                />
-
-                <div className="flex items-center justify-end">
-                  <Button
-                    type="button"
-                    onClick={() => void handleChat()}
-                    disabled={!canChat}
-                    className="w-full sm:w-auto"
-                  >
-                    {isChatting ? (
-                      <>
-                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                        修改中…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        发送修改
-                      </>
-                    )}
-                  </Button>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
             <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
               <Button
