@@ -33,7 +33,9 @@ const MESSAGE_HISTORY_LIMIT = 10;
  * 「访谈内容概述」自由文本框，前端不再采集。这些 key 在请求契约里仍然存在，
  * 故按 PRD §4 发默认值占位（不删 key，不触数据层冻结面）。
  */
-const DEFAULT_COLLECTION_SCENARIO: InterviewScenario = "urban_memory";
+// 导出给 REQ-21 的分流步复用（route-chooser.tsx 建 AI 项目时发同一个默认场景），
+// 避免两处各写一份 "urban_memory" 日后漂移。
+export const DEFAULT_COLLECTION_SCENARIO: InterviewScenario = "urban_memory";
 // 与服务端 NOTES_MAX_LENGTH 对齐。
 const OVERVIEW_MAX_LENGTH = 1000;
 
@@ -73,7 +75,24 @@ function buildFallbackMarkdown(topic: string) {
   ].join("\n");
 }
 
-export function OutlinePlanWorkspace() {
+type OutlinePlanWorkspaceProps = {
+  /**
+   * 被 REQ-21 三步流程当作「提纲步」宿主渲染时为 true：
+   * 去掉自带的整页外壳（<main> / dvh 高度 / 返回链接与标题块），只留表单与提纲本体。
+   * 默认 false —— 独立路由 /projects/new/outline 的行为逐字不变。
+   */
+  embedded?: boolean;
+  /**
+   * 提供时取代「确认 / 跳过」两条路径里的 router.push，把下一步交给宿主。
+   * 无论是否提供，草稿都照常写 sessionStorage（分流步的提纲判定与上传页预填都靠它）。
+   */
+  onContinue?: (result: { skipped: boolean }) => void;
+};
+
+export function OutlinePlanWorkspace({
+  embedded = false,
+  onContinue,
+}: OutlinePlanWorkspaceProps = {}) {
   const router = useRouter();
 
   const [subject, setSubject] = useState("");
@@ -314,6 +333,13 @@ export function OutlinePlanWorkspace() {
       researchFocus: overview.trim(),
       notes: overview.trim(),
     });
+
+    // 被流程宿主接管时不跳 /upload，交给上一步的分流去定去哪儿。
+    if (onContinue) {
+      onContinue({ skipped: false });
+      return;
+    }
+
     router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
   }
 
@@ -328,6 +354,12 @@ export function OutlinePlanWorkspace() {
       researchFocus: overview.trim(),
       notes: overview.trim(),
     });
+
+    if (onContinue) {
+      onContinue({ skipped: true });
+      return;
+    }
+
     router.push(`/upload?${OUTLINE_FLAG_PARAM}=1`);
   }
 
@@ -481,34 +513,38 @@ export function OutlinePlanWorkspace() {
         onClick={handleSkip}
         className="w-full sm:w-auto"
       >
-        跳过，直接上传
+        {embedded ? "跳过提纲，下一步" : "跳过，直接上传"}
       </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={handleEnterAiInterview}
-        disabled={!canEnterAiInterview}
-        className="w-full sm:w-auto"
-      >
-        {isEnteringInterview ? (
-          <>
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-            创建中…
-          </>
-        ) : (
-          <>
-            <Bot className="h-4 w-4" />
-            进入 AI 访谈
-          </>
-        )}
-      </Button>
+      {/* 「进入 AI 访谈」只在独立页出现。嵌进 REQ-21 流程后，AI 那条路
+          归分流步（route-chooser）决定，此处再放一个就成了同屏双入口。 */}
+      {embedded ? null : (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleEnterAiInterview}
+          disabled={!canEnterAiInterview}
+          className="w-full sm:w-auto"
+        >
+          {isEnteringInterview ? (
+            <>
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              创建中…
+            </>
+          ) : (
+            <>
+              <Bot className="h-4 w-4" />
+              进入 AI 访谈
+            </>
+          )}
+        </Button>
+      )}
       <Button
         type="button"
         onClick={handleConfirm}
         disabled={!markdown.trim()}
         className="w-full sm:w-auto"
       >
-        确认提纲，进入上传
+        {embedded ? "确认提纲，下一步" : "确认提纲，进入上传"}
         <ArrowRight className="h-4 w-4" />
       </Button>
     </div>
@@ -696,37 +732,58 @@ export function OutlinePlanWorkspace() {
     </>
   );
 
-  return (
-    <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5 xl:h-dvh xl:overflow-hidden">
-      <div className="flex flex-col gap-2 xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]">
-        <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5">
-          {/* 返回链接的位置与 class 与上传页、项目详情页保持逐字节一致，
-              别改回右侧槽位的按钮样式 —— 三处要看起来是同一个控件。 */}
-          <div className="flex items-start gap-4">
-            <div className="archive-mark hidden sm:grid">
-              <span />
-              <span />
-              <span />
-            </div>
+  // 嵌入时的根标签换成 <section>：外层流程容器已经是 <main>，
+  // 再套一层 <main> 既是重复地标，也会因两层 min-h-dvh / xl:h-dvh / xl:overflow-hidden 打架。
+  // 同理内层不再用 xl:grid（那套行模板的前提是上面有个 header 占 auto 行）。
+  const Root = embedded ? "section" : "main";
 
-            <div>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                返回工作台
-              </Link>
-              <p className="section-eyebrow mt-3">Step 01 · 访谈准备</p>
-              <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
-                生成个性化访谈提纲
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-                填写受访者与访谈要点，生成一版可编辑的提纲；确认后会自动带入上传页的「访谈提纲」字段。
-              </p>
+  return (
+    <Root
+      className={
+        embedded
+          ? "flex min-w-0 flex-col gap-2 xl:min-h-0 xl:flex-1"
+          : "min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5 xl:h-dvh xl:overflow-hidden"
+      }
+    >
+      <div
+        className={
+          embedded
+            ? "flex min-h-0 flex-1 flex-col gap-2"
+            : "flex flex-col gap-2 xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]"
+        }
+      >
+        {/* 嵌入时整块不渲染：标题、返回链接与步骤编号都由流程容器提供
+            （这里的「Step 01 · 访谈准备」在流程里是第 2 步，写死会自相矛盾）。 */}
+        {embedded ? null : (
+          <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5">
+            {/* 返回链接的位置与 class 与上传页、项目详情页保持逐字节一致，
+                别改回右侧槽位的按钮样式 —— 三处要看起来是同一个控件。 */}
+            <div className="flex items-start gap-4">
+              <div className="archive-mark hidden sm:grid">
+                <span />
+                <span />
+                <span />
+              </div>
+
+              <div>
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  返回工作台
+                </Link>
+                <p className="section-eyebrow mt-3">Step 01 · 访谈准备</p>
+                <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
+                  生成个性化访谈提纲
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+                  填写受访者与访谈要点，生成一版可编辑的提纲；确认后会自动带入上传页的「访谈提纲」字段。
+                </p>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {phase === "form" ? (
           /* ── 阶段 1 · 填写态：与 UI-24 之前逐像素一致（lg 仍是两栏表单） ── */
@@ -910,8 +967,10 @@ export function OutlinePlanWorkspace() {
         )}
       </div>
 
-      {/* 移动端输入框固定页面底部、不随内容滚动。必须是 <main> 的直属子节点：
-          backdrop-filter 会成为 fixed 后代的包含块，嵌进任一面板里就不再贴视口。 */}
+      {/* 移动端输入框固定页面底部、不随内容滚动。必须是根元素的直属子节点，
+          且它与根之间不得有 backdrop-filter 祖先（.paper-panel / .meta-pill 都带）——
+          那会成为 fixed 后代的包含块，就不再贴视口。
+          嵌入 REQ-21 流程时同理：流程的步骤体容器刻意不用 paper-panel。 */}
       {phase === "outline" && mobileTab === "outline" ? (
         <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-white via-white to-transparent px-1 pb-[env(safe-area-inset-bottom)] xl:hidden">
           <div className="archive-frame paper-panel paper-panel-strong mb-2 mt-6 rounded-[1.55rem] p-3">
@@ -919,6 +978,6 @@ export function OutlinePlanWorkspace() {
           </div>
         </div>
       ) : null}
-    </main>
+    </Root>
   );
 }
