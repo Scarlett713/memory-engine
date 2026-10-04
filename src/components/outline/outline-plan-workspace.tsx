@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   LoaderCircle,
   NotebookPen,
   Sparkles,
@@ -34,6 +36,12 @@ const MESSAGE_HISTORY_LIMIT = 10;
 const DEFAULT_COLLECTION_SCENARIO: InterviewScenario = "urban_memory";
 // 与服务端 NOTES_MAX_LENGTH 对齐。
 const OVERVIEW_MAX_LENGTH = 1000;
+
+// UI-24：与 project-detail-tabs.tsx:16-19 同一个类串（那份没导出，本地复制）。
+const TAB_ACTIVE =
+  "inline-flex items-center gap-2 rounded-full border border-accent-soft bg-accent-soft/70 px-4 py-2 text-sm font-semibold text-accent-strong";
+const TAB_IDLE =
+  "inline-flex items-center gap-2 rounded-full border border-line/60 bg-white/60 px-4 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground";
 
 type OutlineGenerateResponse = {
   markdown?: string;
@@ -86,6 +94,15 @@ export function OutlinePlanWorkspace() {
   // 提纲默认给渲染后的样子；要动手改再切回编辑。
   const [isPreviewMode, setIsPreviewMode] = useState(true);
 
+  // UI-24 两阶段：phase 是唯一的阶段真源（不用 Boolean(markdown) 派生 ——
+  // 编辑态把 markdown 清空不该把整页弹回填写态）。
+  const [phase, setPhase] = useState<"form" | "outline">("form");
+  // PC（xl）overlay 抽屉开合。
+  const [isFormDrawerOpen, setIsFormDrawerOpen] = useState(false);
+  // 移动端（<xl）Tab。初值取 "outline"：phase="form" 时 Tab 不渲染，该值无副作用；
+  // 万一哪条路径漏了 setMobileTab，兜底也落在产品确认的默认位「提纲修改」。
+  const [mobileTab, setMobileTab] = useState<"form" | "outline">("outline");
+
   // 记住上一次生成的原文，用来判断用户是不是手动改过。
   const lastGeneratedRef = useRef("");
   const canGenerate =
@@ -107,7 +124,8 @@ export function OutlinePlanWorkspace() {
       return;
     }
 
-    // block: "nearest" 只滚最近的滚动祖先（那个 max-h-48 容器），不连带滚整页。
+    // block: "nearest" 只滚最近的滚动祖先（PC 阶段 2 是那个 flex-1 消息区，
+    // 阶段 1 与移动端阶段 2 则是页面本身），不连带滚整页。
     chatBottomRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -171,6 +189,7 @@ export function OutlinePlanWorkspace() {
       setMessages([]);
       lastGeneratedRef.current = generated;
       setNotice("");
+      enterOutlinePhase();
     } catch {
       // 这一支不 rethrow，markdown 同样被换成了通用模板，所以一并清历史。
       const fallback = buildFallbackMarkdown(topic);
@@ -178,9 +197,21 @@ export function OutlinePlanWorkspace() {
       setMessages([]);
       lastGeneratedRef.current = fallback;
       setNotice("LLM 生成失败，已载入通用模板，可手动调整");
+      // 兜底模板同样算「已产出提纲」，照切阶段 2。
+      enterOutlinePhase();
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  /**
+   * UI-24：产出提纲后统一收口。放在「生成中」之外 —— isGenerating 全程不动 phase，
+   * 所以首次生成期间保持阶段 1，已在阶段 2 时重新生成也不闪回填写态。
+   */
+  function enterOutlinePhase() {
+    setPhase("outline");
+    setMobileTab("outline");
+    setIsFormDrawerOpen(false);
   }
 
   async function handleChat() {
@@ -345,6 +376,326 @@ export function OutlinePlanWorkspace() {
     }
   }
 
+  // ── UI-24：以下四个渲染块各只写一份，阶段 1 / PC 抽屉 / 移动端 Tab 三处复用。 ──
+
+  /**
+   * idPrefix 不是可选的：阶段 2 里抽屉副本与移动端 Tab 副本会同时挂载，
+   * 若两份都用 outline-topic/subject/overview，就会出现重复 id，
+   * label 的 htmlFor 会绑到 display:none 的那份输入框上。
+   */
+  function renderProfileCard(idPrefix: string) {
+    return (
+      <div className="surface-card flex min-h-0 flex-1 flex-col rounded-[1.55rem] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="section-eyebrow">
+              受访者画像
+              <span className="ml-1 text-red-500">*</span>
+            </p>
+            <h2 className="mt-1.5 text-base font-semibold text-foreground">
+              必填信息
+            </h2>
+          </div>
+          <div className="tape-label">Profile</div>
+        </div>
+
+        {/* UI-12：单卡三控件，顺序固定为 主题 → 姓名 → 内容概述（对齐 REQ-21）。 */}
+        {/* md:grid-rows-[auto_1fr]：第二行（内容概述）吸收卡片剩余高度，
+            <768px 单列文档流不受影响。 */}
+        <div className="mt-4 grid min-h-0 flex-1 gap-4 md:grid-cols-2 md:grid-rows-[auto_1fr]">
+          <div>
+            <label className="field-label" htmlFor={`${idPrefix}-topic`}>
+              访谈主题
+              <span className="ml-1 text-red-500">*</span>
+            </label>
+            <input
+              id={`${idPrefix}-topic`}
+              className="text-field"
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+              placeholder="例如：老城厢搬迁与邻里记忆"
+            />
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor={`${idPrefix}-subject`}>
+              访谈对象姓名
+              <span className="ml-1 text-red-500">*</span>
+            </label>
+            <input
+              id={`${idPrefix}-subject`}
+              className="text-field"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="例如：陈秀兰"
+            />
+          </div>
+
+          <div className="flex min-h-0 flex-col md:col-span-2">
+            <label className="field-label" htmlFor={`${idPrefix}-overview`}>
+              访谈内容概述
+            </label>
+            <textarea
+              id={`${idPrefix}-overview`}
+              className="text-area min-h-[7rem] flex-1 max-h-[20rem]"
+              value={overview}
+              onChange={(event) => setOverview(event.target.value)}
+              maxLength={OVERVIEW_MAX_LENGTH}
+              placeholder="介绍受访者的人物背景、本次访谈的主要内容与主要事件。例如：受访者 1940 年生，1992 年下岗后经营裁缝铺；本次主要访谈老城厢搬迁前后的邻里记忆。"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const generateRow = (
+    <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs leading-5 text-muted">
+        生成后可自由修改，提纲不会自动上传。
+      </p>
+      <Button
+        type="button"
+        onClick={handleGenerate}
+        disabled={!canGenerate}
+        className="w-full sm:w-auto"
+      >
+        {isGenerating ? (
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+        ) : (
+          <Sparkles className="h-4 w-4" />
+        )}
+        {isGenerating ? "生成中…" : "生成访谈提纲"}
+      </Button>
+    </div>
+  );
+
+  // 验收修订：三条动作按钮始终留在提纲一侧 —— 阶段 1 在右栏底部（原样），
+  // 阶段 2 PC 在预览面板底部、移动端在「提纲修改」Tab 底部。
+  // 抽屉与移动端「填写信息」Tab 只剩表单字段 + 生成按钮。
+  const actionRow = (
+    <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={handleSkip}
+        className="w-full sm:w-auto"
+      >
+        跳过，直接上传
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={handleEnterAiInterview}
+        disabled={!canEnterAiInterview}
+        className="w-full sm:w-auto"
+      >
+        {isEnteringInterview ? (
+          <>
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+            创建中…
+          </>
+        ) : (
+          <>
+            <Bot className="h-4 w-4" />
+            进入 AI 访谈
+          </>
+        )}
+      </Button>
+      <Button
+        type="button"
+        onClick={handleConfirm}
+        disabled={!markdown.trim()}
+        className="w-full sm:w-auto"
+      >
+        确认提纲，进入上传
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  // 预览态与编辑态共用的外框，保证两种模式高度与滚动行为一致。
+  const PREVIEW_FRAME =
+    "soft-scroll min-h-[24rem] flex-1 overflow-auto rounded-[1.1rem] border border-line/60 bg-white/60";
+
+  const previewBody = (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="section-eyebrow">提纲编辑</p>
+          <h2 className="mt-1.5 text-base font-semibold text-foreground">
+            Markdown 草稿
+          </h2>
+        </div>
+        <div className="tape-label">Editable</div>
+      </div>
+
+      {notice ? (
+        <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
+          {notice}
+        </div>
+      ) : null}
+
+      {markdown ? (
+        <>
+          {/* 切换 tab 只在有提纲时出现 —— 空态露出来会指向不存在的可切换内容。 */}
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant={isPreviewMode ? "secondary" : "ghost"}
+              className="min-h-9 px-4 py-1.5"
+              onClick={() => setIsPreviewMode(true)}
+            >
+              预览
+            </Button>
+            <Button
+              type="button"
+              variant={isPreviewMode ? "ghost" : "secondary"}
+              className="min-h-9 px-4 py-1.5"
+              onClick={() => setIsPreviewMode(false)}
+            >
+              编辑
+            </Button>
+          </div>
+
+          {/* 预览与编辑共用同一个框（同一块最小高度、同一套边框/圆角/底色/内滚），
+              切换模式时面板不跳、两种模式的滚动行为一致。
+              padding 放在内层：绝对定位子元素的包含块是父级的 padding box，
+              若 p-4 留在框上，inset-0 的 textarea 会覆盖进 padding 里，与预览的 16px 对不齐。 */}
+          {isPreviewMode ? (
+            <div className={PREVIEW_FRAME}>
+              <div className="p-4">
+                <MarkdownSheet markdown={markdown} />
+              </div>
+            </div>
+          ) : (
+            <div
+              className={`${PREVIEW_FRAME} relative focus-within:border-accent-strong/45 focus-within:ring-4 focus-within:ring-accent-strong/10`}
+            >
+              {/* 不挂 .text-area：它是未分层样式，min-height/resize/圆角恒胜工具类，
+                  会让编辑态和预览态长得不一样。视觉由外层框给。 */}
+              <textarea
+                className="absolute inset-0 h-full w-full resize-none overflow-auto bg-transparent p-4 text-sm leading-7 text-foreground outline-none"
+                value={markdown}
+                onChange={(event) => setMarkdown(event.target.value)}
+                aria-label="访谈提纲草稿"
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="surface-card flex min-h-[24rem] flex-1 items-center justify-center rounded-[1.55rem] px-4 py-4 text-sm leading-6 text-muted">
+          {isGenerating ? (
+            "正在生成提纲…"
+          ) : (
+            /* 「左侧」只在 PC 成立：<xl 阶段 1 是单栏。 */
+            <>
+              填写<span className="hidden xl:inline">左侧</span>信息后点击生成
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  /**
+   * listClassName 必须由调用方给：阶段 1 的列表是 max-h-48 内滚（现状），
+   * 阶段 2 移动端要随页面自然增长（PRD §3.2 明确不做内滚），PC 要 flex-1 吃满面板。
+   * 这三者用响应式类糊在一起会在 <xl 阶段 2 继续套着 max-h-48。
+   */
+  function renderChatBody(listClassName: string) {
+    return (
+      <>
+        {/* 验收修订：去掉「多轮对话细化」小标题 —— 它孤立在编辑区与对话区之间，
+            有消息时右侧计数已足够说明这块是什么。 */}
+        {messages.length ? (
+          <div className="flex items-center justify-end gap-3">
+            <span className="text-xs text-muted">{messages.length} 条记录</span>
+          </div>
+        ) : null}
+
+        {messages.length ? (
+          <div className={listClassName}>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`chat-row ${
+                  message.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div
+                  className={`chat-bubble ${
+                    message.role === "user"
+                      ? "chat-bubble-user"
+                      : "chat-bubble-assistant"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.12em] opacity-80">
+                    {message.role === "assistant" ? (
+                      <>
+                        <Bot className="h-3.5 w-3.5" />
+                        提纲助手
+                      </>
+                    ) : (
+                      <>
+                        <NotebookPen className="h-3.5 w-3.5" />
+                        研究者
+                      </>
+                    )}
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
+                    {message.content}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <div ref={chatBottomRef} />
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-muted">
+            生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
+          </p>
+        )}
+      </>
+    );
+  }
+
+  const chatComposer = (
+    <>
+      <textarea
+        className="text-area min-h-22"
+        value={chatInput}
+        onChange={(event) => setChatInput(event.target.value)}
+        onKeyDown={handleChatKeyDown}
+        disabled={isChatting || isGenerating}
+        maxLength={MESSAGE_MAX_LENGTH}
+        placeholder="例如：把开场问题改得更生活化"
+        aria-label="提纲修改说明"
+      />
+
+      <div className="flex items-center justify-end">
+        <Button
+          type="button"
+          onClick={() => void handleChat()}
+          disabled={!canChat}
+          className="w-full sm:w-auto"
+        >
+          {isChatting ? (
+            <>
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              修改中…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" />
+              发送修改
+            </>
+          )}
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5 xl:h-dvh xl:overflow-hidden">
       <div className="flex flex-col gap-2 xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]">
@@ -377,282 +728,197 @@ export function OutlinePlanWorkspace() {
           </div>
         </header>
 
-        <div className="grid min-w-0 gap-2 lg:grid-cols-2 xl:min-h-0">
-          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
-            <div className="surface-card flex min-h-0 flex-1 flex-col rounded-[1.55rem] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="section-eyebrow">
-                    受访者画像
-                    <span className="ml-1 text-red-500">*</span>
-                  </p>
-                  <h2 className="mt-1.5 text-base font-semibold text-foreground">
-                    必填信息
-                  </h2>
-                </div>
-                <div className="tape-label">Profile</div>
+        {phase === "form" ? (
+          /* ── 阶段 1 · 填写态：与 UI-24 之前逐像素一致（lg 仍是两栏表单） ── */
+          <div className="grid min-w-0 gap-2 lg:grid-cols-2 xl:min-h-0">
+            <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+              {renderProfileCard("outline")}
+              {generateRow}
+            </section>
+
+            <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+              <div className="soft-scroll flex min-h-0 flex-col gap-4 xl:flex-1 xl:overflow-y-auto xl:overflow-x-hidden xl:pr-1">
+                {previewBody}
+
+                {markdown ? (
+                  <div className="surface-card flex flex-col gap-3 rounded-[1.55rem] p-4">
+                    {renderChatBody(
+                      "soft-scroll flex max-h-48 flex-col gap-3 overflow-y-auto pr-1",
+                    )}
+                    {chatComposer}
+                  </div>
+                ) : null}
               </div>
 
-              {/* UI-12：单卡三控件，顺序固定为 主题 → 姓名 → 内容概述（对齐 REQ-21）。 */}
-              {/* md:grid-rows-[auto_1fr]：第二行（内容概述）吸收卡片剩余高度，
-                  <768px 单列文档流不受影响。 */}
-              <div className="mt-4 grid min-h-0 flex-1 gap-4 md:grid-cols-2 md:grid-rows-[auto_1fr]">
-                <div>
-                  <label className="field-label" htmlFor="outline-topic">
-                    访谈主题
-                    <span className="ml-1 text-red-500">*</span>
-                  </label>
-                  <input
-                    id="outline-topic"
-                    className="text-field"
-                    value={topic}
-                    onChange={(event) => setTopic(event.target.value)}
-                    placeholder="例如：老城厢搬迁与邻里记忆"
-                  />
-                </div>
-
-                <div>
-                  <label className="field-label" htmlFor="outline-subject">
-                    访谈对象姓名
-                    <span className="ml-1 text-red-500">*</span>
-                  </label>
-                  <input
-                    id="outline-subject"
-                    className="text-field"
-                    value={subject}
-                    onChange={(event) => setSubject(event.target.value)}
-                    placeholder="例如：陈秀兰"
-                  />
-                </div>
-
-                <div className="flex min-h-0 flex-col md:col-span-2">
-                  <label className="field-label" htmlFor="outline-overview">
-                    访谈内容概述
-                  </label>
-                  <textarea
-                    id="outline-overview"
-                    className="text-area min-h-[7rem] flex-1 max-h-[20rem]"
-                    value={overview}
-                    onChange={(event) => setOverview(event.target.value)}
-                    maxLength={OVERVIEW_MAX_LENGTH}
-                    placeholder="介绍受访者的人物背景、本次访谈的主要内容与主要事件。例如：受访者 1940 年生，1992 年下岗后经营裁缝铺；本次主要访谈老城厢搬迁前后的邻里记忆。"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs leading-5 text-muted">
-                生成后可自由修改，提纲不会自动上传。
-              </p>
-              <Button
+              {actionRow}
+            </section>
+          </div>
+        ) : (
+          /* ── 阶段 2 · 提纲态：表单让位给「预览 │ 对话」，PC 收进抽屉、移动端进 Tab ── */
+          <div className="flex min-w-0 flex-col gap-2 xl:min-h-0">
+            {/* 移动端 Tab 栏：只在已产出提纲后出现，PC 不渲染。
+                两个面板都用可见性切换（不条件渲染），切 Tab 才不会 unmount 丢焦点。 */}
+            <div
+              role="tablist"
+              aria-label="提纲工作台视图"
+              className="flex flex-wrap gap-2 xl:hidden"
+            >
+              <button
                 type="button"
-                onClick={handleGenerate}
-                disabled={!canGenerate}
-                className="w-full sm:w-auto"
+                role="tab"
+                id="outline-tab-form"
+                aria-selected={mobileTab === "form"}
+                aria-controls="outline-panel-form"
+                onClick={() => setMobileTab("form")}
+                className={mobileTab === "form" ? TAB_ACTIVE : TAB_IDLE}
               >
-                {isGenerating ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {isGenerating ? "生成中…" : "生成访谈提纲"}
-              </Button>
+                填写信息
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="outline-tab-outline"
+                aria-selected={mobileTab === "outline"}
+                aria-controls="outline-panel-outline"
+                onClick={() => setMobileTab("outline")}
+                className={mobileTab === "outline" ? TAB_ACTIVE : TAB_IDLE}
+              >
+                提纲修改
+              </button>
             </div>
-          </section>
 
-          <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
-            <div className="soft-scroll flex min-h-0 flex-col gap-4 xl:flex-1 xl:overflow-y-auto xl:overflow-x-hidden xl:pr-1">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="section-eyebrow">提纲编辑</p>
-                  <h2 className="mt-1.5 text-base font-semibold text-foreground">
-                    Markdown 草稿
-                  </h2>
-                </div>
-                <div className="tape-label">Editable</div>
-              </div>
+            <section
+              id="outline-panel-form"
+              role="tabpanel"
+              aria-labelledby="outline-tab-form"
+              className={`archive-frame paper-panel paper-panel-strong flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:hidden ${
+                mobileTab === "form" ? "flex" : "hidden"
+              }`}
+            >
+              {renderProfileCard("outline-mobile")}
+              {generateRow}
+            </section>
 
-              {notice ? (
-                <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
-                  {notice}
-                </div>
-              ) : null}
-
-              {markdown ? (
-                <>
-                  {/* 切换 tab 只在有提纲时出现 —— 空态露出来会指向不存在的可切换内容。 */}
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant={isPreviewMode ? "secondary" : "ghost"}
-                      className="min-h-9 px-4 py-1.5"
-                      onClick={() => setIsPreviewMode(true)}
-                    >
-                      预览
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={isPreviewMode ? "ghost" : "secondary"}
-                      className="min-h-9 px-4 py-1.5"
-                      onClick={() => setIsPreviewMode(false)}
-                    >
-                      编辑
-                    </Button>
-                  </div>
-
-                  {/* 两种模式共用同一块最小高度，切换时面板不跳。 */}
-                  {isPreviewMode ? (
-                    <div className="soft-scroll min-h-[24rem] flex-1 overflow-auto rounded-[1.1rem] border border-line/60 bg-white/60 p-4">
-                      <MarkdownSheet markdown={markdown} />
-                    </div>
+            {/* relative 是 overlay 的定位上下文。注意不带 lg:grid-cols-2 ——
+                1024–1279px 归移动形态，长出两列就与 Tab 打架了。 */}
+            <div
+              id="outline-panel-outline"
+              role="tabpanel"
+              aria-labelledby="outline-tab-outline"
+              className={`relative grid min-w-0 gap-2 xl:min-h-0 xl:flex-1 xl:grid-cols-[3rem_minmax(0,1fr)] ${
+                mobileTab === "form" ? "hidden xl:grid" : "grid"
+              }`}
+            >
+              {/* 细条：宽 w-12 = 3rem = 栅格第一列。z-[65] 夹在遮罩(55)与全屏模态(70)之间，
+                  且必须高于抽屉(60) —— 否则抽屉会盖住图标，「再点图标收回」就点不到了。
+                  验收修订：不挂 paper-panel / archive-frame，细条不带底色、边框、阴影、圆角
+                  与毛玻璃，只留一个 ghost 图标；relative 必须在这里显式给（原来由 .paper-panel 附带，
+                  去掉后若变 static，z-[65] 会整条失效）。 */}
+              <aside className="relative z-[65] hidden w-12 flex-col items-center pt-4 xl:flex">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  title="修改填写信息"
+                  aria-label={isFormDrawerOpen ? "收起填写信息" : "展开填写信息"}
+                  aria-expanded={isFormDrawerOpen}
+                  aria-controls="outline-profile-drawer"
+                  onClick={() => setIsFormDrawerOpen((open) => !open)}
+                  className="min-h-10 w-10 px-0 py-0"
+                >
+                  {isFormDrawerOpen ? (
+                    <ChevronLeft className="h-5 w-5" />
                   ) : (
-                    <textarea
-                      className="text-area min-h-[24rem] flex-1"
-                      value={markdown}
-                      onChange={(event) => setMarkdown(event.target.value)}
-                      aria-label="访谈提纲草稿"
-                    />
+                    <ChevronRight className="h-5 w-5" />
                   )}
-                </>
-              ) : (
-                <div className="surface-card flex min-h-[24rem] flex-1 items-center justify-center rounded-[1.55rem] px-4 py-4 text-sm leading-6 text-muted">
-                  {isGenerating ? "正在生成提纲…" : "填写左侧信息后点击生成"}
-                </div>
-              )}
+                </Button>
+              </aside>
 
-              {markdown ? (
-                <div className="surface-card flex flex-col gap-3 rounded-[1.55rem] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="section-eyebrow">多轮对话细化</p>
-                    {messages.length ? (
-                      <span className="text-xs text-muted">
-                        {messages.length} 条记录
-                      </span>
-                    ) : null}
+              {/* 抽屉打开时把右区设为 inert：仓库没有 focus trap，
+                  否则 Tab 键会串到遮罩后面（PRD §10-8）。 */}
+              <div
+                inert={isFormDrawerOpen}
+                className="grid min-w-0 gap-2 xl:min-h-0 xl:grid-cols-2"
+              >
+                <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+                  <div className="soft-scroll flex min-h-0 flex-col gap-4 xl:flex-1 xl:overflow-y-auto xl:overflow-x-hidden xl:pr-1">
+                    {previewBody}
                   </div>
 
-                  {messages.length ? (
-                    <div className="soft-scroll flex max-h-48 flex-col gap-3 overflow-y-auto pr-1">
-                      {messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`chat-row ${
-                            message.role === "user"
-                              ? "justify-end"
-                              : "justify-start"
-                          }`}
-                        >
-                          <div
-                            className={`chat-bubble ${
-                              message.role === "user"
-                                ? "chat-bubble-user"
-                                : "chat-bubble-assistant"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.12em] opacity-80">
-                              {message.role === "assistant" ? (
-                                <>
-                                  <Bot className="h-3.5 w-3.5" />
-                                  提纲助手
-                                </>
-                              ) : (
-                                <>
-                                  <NotebookPen className="h-3.5 w-3.5" />
-                                  研究者
-                                </>
-                              )}
-                            </div>
-                            <p className="mt-3 whitespace-pre-wrap text-sm leading-7">
-                              {message.content}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={chatBottomRef} />
-                    </div>
-                  ) : (
-                    <p className="text-sm leading-6 text-muted">
-                      生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
-                    </p>
+                  {/* 动作行贴在预览面板底部、滚动区之外，只在 PC 显示 ——
+                      移动端那一份在「提纲修改」Tab 最底部（见下方 pb-64 那块）。
+                      这个 section 在移动端也存在，不加 hidden xl:block 会多出第三份。 */}
+                  <div className="hidden shrink-0 xl:block">{actionRow}</div>
+                </section>
+
+                <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-3 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+                  {/* 移动端底下是动作行 + pb-64 留白，不再需要给固定输入条预留的 pb-36。 */}
+                  {renderChatBody(
+                    "soft-scroll flex min-h-0 flex-col gap-3 overflow-y-auto pr-1 xl:flex-1",
                   )}
 
-                  <textarea
-                    className="text-area min-h-22"
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    onKeyDown={handleChatKeyDown}
-                    disabled={isChatting || isGenerating}
-                    maxLength={MESSAGE_MAX_LENGTH}
-                    placeholder="例如：把开场问题改得更生活化"
-                    aria-label="提纲修改说明"
-                  />
+                  {/* PC 的输入区贴在面板底部（滚动区之外）；移动端走下面那条固定条。
+                      xl:mt-auto 兜住「还没发过消息」时 flex-1 不存在的情况。 */}
+                  <div className="hidden shrink-0 flex-col gap-3 xl:mt-auto xl:flex">
+                    {chatComposer}
+                  </div>
+                </section>
+              </div>
 
-                  <div className="flex items-center justify-end">
-                    <Button
-                      type="button"
-                      onClick={() => void handleChat()}
-                      disabled={!canChat}
-                      className="w-full sm:w-auto"
-                    >
-                      {isChatting ? (
-                        <>
-                          <LoaderCircle className="h-4 w-4 animate-spin" />
-                          修改中…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          发送修改
-                        </>
-                      )}
-                    </Button>
+              {/* 遮罩与抽屉都是绝对定位的直属子节点：脱离文档流，不占栅格位。 */}
+              <div
+                onClick={() => setIsFormDrawerOpen(false)}
+                className={`absolute inset-0 z-[55] hidden bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px] transition-opacity duration-200 ease-out motion-reduce:transition-none xl:block ${
+                  isFormDrawerOpen
+                    ? "opacity-100"
+                    : "pointer-events-none opacity-0"
+                }`}
+              />
+
+              {/* left-12 而不是 left-0：细条压在抽屉下面会吃掉表单左边缘。 */}
+              <div
+                id="outline-profile-drawer"
+                aria-hidden={!isFormDrawerOpen}
+                inert={!isFormDrawerOpen}
+                className={`absolute inset-y-0 left-12 z-[60] hidden w-[min(32rem,88%)] transition-transform duration-300 ease-out motion-reduce:transition-none xl:block ${
+                  isFormDrawerOpen
+                    ? "translate-x-0"
+                    : "pointer-events-none -translate-x-full"
+                }`}
+              >
+                {/* .paper-panel 恒带 overflow:hidden（globals.css 未分层），
+                    所以内滚必须放到再内一层，挂同一个元素上会被静默吃掉。 */}
+                <div className="archive-frame paper-panel paper-panel-strong h-full rounded-[1.85rem]">
+                  <div className="soft-scroll h-full overflow-y-auto">
+                    <div className="flex flex-col gap-4 p-4 md:p-5">
+                      {renderProfileCard("outline")}
+                      {generateRow}
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleSkip}
-                className="w-full sm:w-auto"
-              >
-                跳过，直接上传
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleEnterAiInterview}
-                disabled={!canEnterAiInterview}
-                className="w-full sm:w-auto"
-              >
-                {isEnteringInterview ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    创建中…
-                  </>
-                ) : (
-                  <>
-                    <Bot className="h-4 w-4" />
-                    进入 AI 访谈
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirm}
-                disabled={!markdown.trim()}
-                className="w-full sm:w-auto"
-              >
-                确认提纲，进入上传
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </section>
-        </div>
+            {/* 移动端动作行：必须放在 outline-panel-outline 之外 —— 那是个栅格，
+                第 5 个子节点会被当成栅格项丢进第二行第一列。也必须带 mobileTab 门，
+                否则切到「填写信息」Tab 时它会重复露出一份。
+                pb-64（16rem）给底部固定输入条（约 13rem）让位 —— 输入框会随用户
+                敲长句自动增高，13rem 只是下限，留 ~50px 余量兜住。 */}
+            {mobileTab === "outline" ? (
+              <div className="pb-64 xl:hidden">{actionRow}</div>
+            ) : null}
+          </div>
+        )}
       </div>
+
+      {/* 移动端输入框固定页面底部、不随内容滚动。必须是 <main> 的直属子节点：
+          backdrop-filter 会成为 fixed 后代的包含块，嵌进任一面板里就不再贴视口。 */}
+      {phase === "outline" && mobileTab === "outline" ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-white via-white to-transparent px-1 pb-[env(safe-area-inset-bottom)] xl:hidden">
+          <div className="archive-frame paper-panel paper-panel-strong mb-2 mt-6 rounded-[1.55rem] p-3">
+            <div className="flex flex-col gap-3">{chatComposer}</div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
