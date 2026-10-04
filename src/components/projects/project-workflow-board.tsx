@@ -20,11 +20,21 @@ const iconMap = {
   export: FileOutput,
 };
 
-const statusMap: Record<WorkflowStatus, string> = {
+export const statusMap: Record<WorkflowStatus, string> = {
   completed: "已完成",
   in_progress: "进行中",
   pending: "待处理",
 };
+
+// 首页卡片（recent-project-list）也要展示同一条「当前阶段」文案。
+// manual_review 的特判收在这里，避免两处各写一份、日后改词漂移。
+export function getWorkflowStatusLabel(
+  step: Pick<WorkflowStep, "key" | "status">,
+): string {
+  return step.key === "manual_review" && step.status === "in_progress"
+    ? "待您审校"
+    : (statusMap[step.status] ?? statusMap.pending);
+}
 
 export function ProjectWorkflowBoard({
   workflow,
@@ -70,10 +80,7 @@ export function ProjectWorkflowBoard({
                         : "bg-white/80 text-muted"
                   }`}
                 >
-                  {step.key === "manual_review" &&
-                  step.status === "in_progress"
-                    ? "待您审校"
-                    : (statusMap[step.status] ?? statusMap.pending)}
+                  {getWorkflowStatusLabel(step)}
                 </span>
               </div>
 

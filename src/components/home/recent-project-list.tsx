@@ -11,6 +11,7 @@ import {
   Workflow,
 } from "lucide-react";
 
+import { getWorkflowStatusLabel } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   HOME_SCROLL_STORAGE_KEY,
@@ -70,12 +71,12 @@ export function RecentProjectList({
   }
 
   return (
-    <section className="paper-panel rounded-[2rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+    <section className="flex min-w-0 flex-col xl:min-h-0 xl:flex-1">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="section-eyebrow">项目索引</p>
-          <h2 className="font-display mt-2 text-[1.8rem] font-semibold text-accent-strong md:text-[2.15rem]">
-            已建档项目
+          <h2 className="font-display mt-2 text-[1.35rem] font-semibold text-accent-strong">
+            历史项目
           </h2>
         </div>
 
@@ -111,7 +112,7 @@ export function RecentProjectList({
                 <p className="text-sm font-semibold">暂无项目</p>
               </div>
               <p className="mt-3 text-sm leading-6 text-muted">
-                上传受访音视频并完成建档后，这里会显示项目进度与进入入口。
+                点上方「新建访谈」开始建档，完成后项目会出现在这里。
               </p>
             </div>
           ) : null}
@@ -123,11 +124,16 @@ export function RecentProjectList({
             )}%`;
             const isDeleting =
               isPending && pendingProjectId === project.id;
+            // 当前阶段：优先「进行中」的那一步，没有就退回第一个「待处理」。
+            // 全部完成时不显示——此时 StatusBadge 已经在说结果了。
+            const activeStep =
+              project.workflow.find((step) => step.status === "in_progress") ??
+              project.workflow.find((step) => step.status === "pending");
 
             return (
               <article
                 key={project.id}
-                className="group surface-card rounded-[1.45rem] p-4"
+                className="surface-card rounded-[1.45rem] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -136,6 +142,12 @@ export function RecentProjectList({
                         {project.projectName}
                       </h3>
                       <StatusBadge status={project.status} />
+                      {activeStep ? (
+                        <span className="meta-pill text-xs font-medium text-muted">
+                          当前阶段：{activeStep.label} ·{" "}
+                          {getWorkflowStatusLabel(activeStep)}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-2 truncate text-sm text-muted">
                       受访对象：{project.intervieweeName || "未填写"}
@@ -148,7 +160,7 @@ export function RecentProjectList({
                   <div className="flex shrink-0 items-center gap-2">
                     <Link
                       href={`/projects/${project.id}`}
-                      className="meta-pill text-sm font-medium text-accent-strong transition-transform group-hover:-translate-y-0.5"
+                      className="meta-pill text-sm font-medium text-accent-strong transition-colors hover:text-accent-strong/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
                     >
                       打开
                       <ArrowUpRight className="h-4 w-4" />

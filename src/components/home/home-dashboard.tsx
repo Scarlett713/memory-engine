@@ -33,10 +33,10 @@ export function HomeDashboard() {
               <div>
                 <p className="section-eyebrow">记忆引擎</p>
                 <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
-                  已建档口述项目
+                  口述项目工作台
                 </h1>
                 <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-                  全部受访项目的归档入口。打开任一项目即可进入处理台，查看转写、整理与导出进度。
+                  新建访谈、续写草稿、打开已建档项目，都在这一页。
                 </p>
               </div>
             </div>
@@ -44,12 +44,12 @@ export function HomeDashboard() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:min-w-[420px] xl:justify-end">
               {/* 徽标槽位的固定占位。useAuth 的 user 是组件内 state，客户端跳转回首页时
                   组件重新挂载 —— user 先是 null（徽标不渲染），/api/auth/me 到货后才插进来，
-                  header 被撑高，下方列表跟着下跳。跳变量恒为 47px（徽标实测高度）+ 外层 gap-3
-                  的 12px = 59px，与这一列里已排了几个 CTA 无关。
-                  本列现在是「槽位 / 新建访谈项目 / 新建访谈（含提纲生成）」三项：两个 CTA
-                  都不依赖异步数据、首帧即渲染，因此不参与占位 —— 只有槽位常驻 47px 才抵得掉
-                  那 59px。min-h 取 47 而非 59：有徽标时 max(47, 47) 不生长，375px 的 header
-                  保持原高；≥640px 槽位已被 CTA 撑到 54px，47 ≤ 54 同样不生长。全断点中性。 */}
+                  header 被撑高，下方三区跟着下跳。
+
+                  REQ-16 把两个新建 CTA 迁进「新建」区后，本列只剩槽位一项：
+                  无徽标时槽位被 min-h 撑到 47px；徽标到货后内容高 47px，max(47, 47) 不生长。
+                  单子元素不产生 gap-3 的子项间距，故跳变量为 0，全断点中性。
+                  47 仍是徽标实测高度，数值待 measure-375.mjs 复测后定稿。 */}
               <div className="min-h-[47px]">
                 {user ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 sm:justify-start">
@@ -74,25 +74,58 @@ export function HomeDashboard() {
                   </div>
                 ) : null}
               </div>
-
-              <Link
-                href="/projects/new/outline"
-                className="sidebar-secondary w-full px-5 sm:w-auto"
-              >
-                <Plus className="h-4 w-4" />
-                新建访谈（含提纲生成）
-              </Link>
-
-              <Link href="/upload" className="sidebar-cta w-full px-5 sm:w-auto">
-                <Plus className="h-4 w-4" />
-                新建访谈项目
-              </Link>
             </div>
           </div>
         </header>
 
-        <section className="min-w-0 xl:min-h-0">
-          <RecentProjectList projects={projects} isLoading={isLoading} />
+        <section className="flex min-w-0 flex-col gap-2 xl:grid xl:min-h-0 xl:grid-cols-[minmax(0,17rem)_minmax(0,17rem)_minmax(0,1fr)]">
+          <div
+            data-home-zone="new"
+            className="paper-panel archive-frame flex flex-col gap-3 rounded-[2rem] p-5 xl:min-h-0"
+          >
+            <p className="section-eyebrow">新建</p>
+            <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
+              开始一个新项目
+            </h2>
+            <p className="text-sm leading-6 text-muted">
+              填写受访者与访谈主题，生成个性化提纲后进入建档流程。
+            </p>
+            {/* 首页唯一的新建入口。REQ-16 之前 header 里有两个 CTA（/projects/new/outline
+                与 /upload），现收敛为这一个；/upload 降级为非首页入口，仅由提纲链路跳入。 */}
+            <Link
+              href="/projects/new/outline"
+              className="sidebar-cta mt-auto w-full px-5"
+            >
+              <Plus className="h-4 w-4" />
+              新建访谈
+            </Link>
+          </div>
+
+          <div
+            data-home-zone="draft"
+            className="paper-panel archive-frame flex flex-col gap-3 rounded-[2rem] p-5 xl:min-h-0"
+          >
+            <p className="section-eyebrow">草稿</p>
+            <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
+              未完成的草稿
+            </h2>
+            {/* REQ-15 未到位，本区只落空态：不读写存储、不自建第二套 sessionStorage。 */}
+            <div className="surface-card rounded-[1.5rem] p-5">
+              <p className="text-sm font-semibold text-accent-strong">暂无草稿</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                新建访谈后未提交的内容会出现在这里，可随时继续填写。
+              </p>
+            </div>
+          </div>
+
+          {/* 历史项目区：外壳只出面板与内边距，区头（eyebrow + 「历史项目」+ 计数 pill）
+              由 RecentProjectList 自己渲染，避免两处标题重复。 */}
+          <div
+            data-home-zone="projects"
+            className="paper-panel archive-frame flex min-w-0 flex-col rounded-[2rem] p-5 xl:min-h-0"
+          >
+            <RecentProjectList projects={projects} isLoading={isLoading} />
+          </div>
         </section>
       </div>
     </main>
