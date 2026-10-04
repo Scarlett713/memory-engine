@@ -87,7 +87,15 @@ type OutlinePlanWorkspaceProps = {
    * 无论是否提供，草稿都照常写 sessionStorage（分流步的提纲判定与上传页预填都靠它）。
    */
   onContinue?: (result: { skipped: boolean }) => void;
+  /**
+   * 「主题」输入框的初值。默认 "" —— 不传时与本次改动前的行为逐字一致。
+   * 三步流程传基本信息步的项目名，免去用户在提纲步重输（PRD REQ-21 §5.2）。
+   */
   initialTopic?: string;
+  /**
+   * 「受访者」输入框的初值。默认 "" —— 不传时与本次改动前的行为逐字一致。
+   * 与 initialTopic 同源，取自基本信息步的受访者姓名。
+   */
   initialSubject?: string;
 };
 
