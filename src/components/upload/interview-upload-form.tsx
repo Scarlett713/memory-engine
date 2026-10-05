@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AudioLines,
@@ -79,6 +80,12 @@ const wizardSteps: Array<{ step: WizardStep; label: string }> = [
   { step: 2, label: "采集路径" },
   { step: 3, label: "音频与提交" },
 ];
+
+// REQ-24 §4.3：新版分支底栏「返回上一步」的落点 —— 新建流程的分流步。
+// 用常量而非内联字面量：探针 J2/J3 与访谈页（同名常量，各自文件内声明）按同一字符串断言。
+// 必须是真实 a[href]（Link，不是 Button + router.push）—— 中键新开、无 JS 兜底、
+// href 属性可断言，且历史栈语义确定（不用 router.back()，见 PRD §4.3）。
+const ROUTE_STEP_HREF = "/projects/new?step=route";
 
 // 知情同意弹窗：创建项目的唯一闸口，用户点「我确认」之后才真正发起创建。
 // 不做任何本地记忆 —— 每次点「创建项目」都重新弹，并重置勾选态。
@@ -220,22 +227,27 @@ export function InterviewUploadForm() {
   const [prefill] = useState(() => readInitialOutlineDraft(hasOutlineFlag));
 
   // REQ-21 §5.2：基本信息已由新建流程写入草稿的 projectName / intervieweeName，
-  // 两项齐了就直接从步骤二开始，不再要求重复填写。缺任一则维持从步骤一开始。
-  //
-  // REQ-21 / P3：从新建流程的分流步跳进来时，采集路径已在上一步选过（用户点的就是
-  // 「上传音频」），画像也已在基本信息步填过 —— 再让用户点一遍是重复劳动，直接落到
-  // 「音频与提交」。必须同时要求 outline 标记位：裸访问 /upload、老书签、?outline=0
-  // 时 hasOutlineFlag 为 false，逐字走下面的原逻辑，行为零变化。
-  const [step, setStep] = useState<WizardStep>(() => {
-    const ready = Boolean(
-      prefill?.profile.projectName && prefill?.profile.intervieweeName,
-    );
+  // 两项齐了才称得上「从新建流程进来」；缺任一（老书签、手写 URL、清过 sessionStorage）
+  // 都维持从步骤一开始，不再要求重复填写。
+  const draftReady = Boolean(
+    prefill?.profile.projectName && prefill?.profile.intervieweeName,
+  );
+  // REQ-24 §4.1：新版分支（分流支路）的唯一开关 = 「带标记位」且「草稿就绪」。
+  // 必须同时要求标记位：裸 /upload、老书签、?outline=0 时 hasOutlineFlag 为 false，
+  // 逐字走下面的原逻辑，旧版行为零变化。
+  // 只看标记位不看草稿就绪会造出死路：必填字段没有 UI 可填，提交必被 validateStepOne 弹回
+  // （PRD §4.1「反例防护」，规格而非实现细节）。
+  const flowMode = hasOutlineFlag && draftReady;
 
-    if (hasOutlineFlag && ready) {
+  // REQ-24 §4.2：从分流步进来的用户，采集路径已在上一步选过（点的就是「上传音频」），
+  // 画像也已在基本信息步填过，来路是新建流程的三步 —— 直接落到「音频与提交」：
+  // 既不重填，也不再渲染步骤条（步骤条会让人以为还要走前两步）。
+  const [step, setStep] = useState<WizardStep>(() => {
+    if (flowMode) {
       return 3;
     }
 
-    return ready ? 2 : 1;
+    return draftReady ? 2 : 1;
   });
 
   // ── Step 1 基础信息 ──────────────────────────────────────
@@ -380,13 +392,11 @@ export function InterviewUploadForm() {
     goToStep(step === 3 ? 2 : 1);
   }
 
-  // P3：从新建流程分流步进来的用户没有「upload 内部上一步」的概念 —— 新建流程的步骤
-  // 是 SPA 内部 state，刷新即丢，goBack 只会把人带回 upload 自己的步骤一，与用户的
-  // 来路再无关系。留个按钮只会误导，藏掉。
-  // 只在「步骤三 + 带标记位」这一种组合下藏：用户若自己点步骤条回到步骤二，按钮照常
-  // 出现（那是 upload 内部回退，语义正确）；从步骤二点「下一步」回到步骤三后它会再次
-  // 隐藏 —— 预期行为，用户始终处在「从新建流程进入」的上下文里。
-  const hideBackButton = step === 3 && hasOutlineFlag;
+  // REQ-24 §3.3（取代 REQ-21 / P3 口径）：新版分支（从分流步进来）不再渲染步骤条，
+  // 页面里也就没有「上传页内部上一步」这个概念了 —— 传进去只会把人带回 upload 自己的
+  // 步骤一，与用户来路（新建流程 basic → outline → route）再无关系。
+  // 回退入口因此只有一个：底栏「返回上一步」→ /projects/new?step=route（见下方底栏区段）。
+  // 旧版向导（裸 /upload、?outline=1 但草稿不就绪）逐字不变：step > 1 时「上一步」照常出现。
 
   async function submitProject() {
     if (!audioFile) {
@@ -472,42 +482,50 @@ export function InterviewUploadForm() {
   }
 
   return (
-    <section className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+    <section
+      className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] p-5 md:p-6 xl:flex xl:h-full xl:min-h-0 xl:flex-col"
+      data-upload-flow={flowMode ? "from-route" : undefined}
+    >
       <form
         className="mt-1 flex flex-col gap-4 xl:min-h-0 xl:flex-1"
         onSubmit={handleFormSubmit}
       >
-        {/* 步骤条：仅支持回退，前进必须走「下一步」校验 */}
-        <ol className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {wizardSteps.map(({ step: stepNumber, label }) => {
-            const isCurrent = step === stepNumber;
-            const isDone = step > stepNumber;
-            const canGoBack = stepNumber < step;
+        {/* 步骤条：仅支持回退，前进必须走「下一步」校验。
+            REQ-24 §4.2：新版分支（从分流步进来）不渲染它 —— 「01/02/03」会让人以为
+            还要填前两步，而那两步在分流支路里已经走过；判据是「不在 DOM」，
+            不是隐藏（hidden / sr-only / disabled 均不合规）。 */}
+        {flowMode ? null : (
+          <ol className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {wizardSteps.map(({ step: stepNumber, label }) => {
+              const isCurrent = step === stepNumber;
+              const isDone = step > stepNumber;
+              const canGoBack = stepNumber < step;
 
-            return (
-              <li key={stepNumber} className="min-w-0 sm:flex-1">
-                <button
-                  type="button"
-                  disabled={!canGoBack}
-                  aria-current={isCurrent ? "step" : undefined}
-                  onClick={() => goToStep(stepNumber)}
-                  className={`flex w-full items-center gap-2 rounded-[1rem] border px-3 py-2 text-left text-sm transition-colors ${
-                    isCurrent
-                      ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
-                      : isDone
-                        ? "border-line/80 bg-white/70 text-foreground"
-                        : "border-line/60 bg-white/40 text-muted"
-                  } ${canGoBack ? "cursor-pointer hover:border-accent-soft" : "cursor-default"}`}
-                >
-                  <span className="text-[11px] font-semibold tracking-[0.18em]">
-                    {String(stepNumber).padStart(2, "0")}
-                  </span>
-                  <span className="truncate font-semibold">{label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+              return (
+                <li key={stepNumber} className="min-w-0 sm:flex-1">
+                  <button
+                    type="button"
+                    disabled={!canGoBack}
+                    aria-current={isCurrent ? "step" : undefined}
+                    onClick={() => goToStep(stepNumber)}
+                    className={`flex w-full items-center gap-2 rounded-[1rem] border px-3 py-2 text-left text-sm transition-colors ${
+                      isCurrent
+                        ? "border-accent-soft bg-accent-soft/70 text-accent-strong"
+                        : isDone
+                          ? "border-line/80 bg-white/70 text-foreground"
+                          : "border-line/60 bg-white/40 text-muted"
+                    } ${canGoBack ? "cursor-pointer hover:border-accent-soft" : "cursor-default"}`}
+                  >
+                    <span className="text-[11px] font-semibold tracking-[0.18em]">
+                      {String(stepNumber).padStart(2, "0")}
+                    </span>
+                    <span className="truncate font-semibold">{label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        )}
 
         <div className="soft-scroll space-y-4 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-auto">
           {step === 1 ? (
@@ -918,7 +936,16 @@ export function InterviewUploadForm() {
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {step > 1 && !hideBackButton ? (
+            {flowMode ? (
+              <Link
+                href={ROUTE_STEP_HREF}
+                data-upload-back="route-step"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-line-strong bg-white/72 px-5 py-3 text-sm font-semibold tracking-[0.02em] text-accent-strong transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/92 sm:w-auto"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                返回上一步
+              </Link>
+            ) : step > 1 ? (
               <Button
                 type="button"
                 variant="secondary"

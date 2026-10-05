@@ -965,17 +965,20 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
             </div>
 
             {/* min-w-0 flex-1：父级是 items-start，不给 flex-1 的话本列只占内容宽，
-                右对齐的退出按钮会贴着「返回提纲」而不是贴顶栏右缘。 */}
+                右对齐的退出按钮会贴着「返回上一步」而不是贴顶栏右缘。 */}
             <div className="min-w-0 flex-1">
-              {/* P8：顶栏左「返回提纲」（非破坏，进度保留）右「退出访谈」（放弃，回首页）。
-                  两者语义不同，视觉上也要分得开 —— 退出用 ghost + 弱化色，不与返回抢视线。 */}
+              {/* REQ-24 §4.4（取代 REQ-16 / P8 的落点口径）：顶栏左「返回上一步」= 回新建流程的
+                  分流步（/projects/new?step=route）—— 仍是「非破坏，进度保留」，只是不再指向
+                  /projects/{id}/outline（REQ-24 后 UI 已无该页，目标 404）。
+                  右「退出访谈」（放弃，回首页）语义与视觉都不变：退出用 ghost + 弱化色，不与返回抢视线。 */}
               <div className="flex items-center justify-between gap-3">
                 <Link
-                  href={`/projects/${project.id}/outline`}
+                  href="/projects/new?step=route"
+                  data-interview-back="route-step"
                   className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  返回提纲
+                  返回上一步
                 </Link>
                 <Button
                   type="button"
