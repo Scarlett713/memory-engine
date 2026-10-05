@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AudioLines, Bot, LoaderCircle, NotebookPen } from "lucide-react";
 
@@ -52,16 +53,30 @@ function OutlineRequiredDialog({
     return null;
   }
 
-  return (
+  // 必须挂到 body：本组件嵌在 .paper-panel 之内（route-chooser.tsx 的根元素就是它），
+  // 而 .paper-panel 会从两处破坏 fixed ——
+  // (1) backdrop-filter: blur(24px)（globals.css:104）让面板成为 fixed 后代的包含块，
+  //     遮罩于是相对面板而非视口定位；
+  // (2) 未分层的 `.paper-panel > * { position: relative }`（globals.css:125）直接压掉
+  //     Tailwind 的 .fixed —— 后者在 @layer utilities 里，未分层正常声明恒胜过分层声明。
+  // 实测后果：遮罩的计算样式是 relative，inset-0 失效，它退回文档流堆在卡片页脚之后，
+  // 再被 .paper-panel 的 overflow: hidden 裁掉 —— 就是「提示出现在页面底部而非弹窗」。
+  // 挂到 body 一次摆脱这两个问题。
+  return createPortal(
     <div
       data-route-modal="outline-required"
       className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]"
+      onClick={onClose}
     >
       <div className="flex h-full flex-col items-center justify-center p-3 sm:p-5">
+        {/* stopPropagation 必须挂在卡片上，不能挂上面那层包裹 div —— 它是 flex h-full，
+            铺满整个遮罩，挂它上面会把「点遮罩关闭」整个吃掉（实测：点 (6,6) 无效）。
+            点遮罩只关弹窗、不触发 onBackToOutline —— 用户留在分流步，随时可以重选。 */}
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="outline-required-title"
+          onClick={(event) => event.stopPropagation()}
           className="paper-panel paper-panel-strong flex w-full max-w-xl flex-col rounded-[2rem] px-4 py-5 md:px-6 md:py-6"
         >
           <div className="flex items-center gap-2 text-accent-strong">
@@ -73,12 +88,12 @@ function OutlineRequiredDialog({
             id="outline-required-title"
             className="font-display mt-2 text-[1.5rem] font-semibold text-accent-strong"
           >
-            需要先有访谈提纲
+            需要访谈提纲
           </h2>
 
           <p className="mt-3 text-sm leading-7 text-muted">
             AI
-            实时访谈需要先有访谈提纲，请先补填提纲后再开始。补填完成后回到这一步重新选择即可。
+            实时访谈需要提纲来引导对话。请先完成提纲，再开始访谈。补填完成后回到这一步重新选择即可。
           </p>
 
           <div className="mt-4 flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
@@ -95,12 +110,13 @@ function OutlineRequiredDialog({
               className="w-full justify-center sm:w-auto sm:min-w-[140px]"
               onClick={onGoOutline}
             >
-              去补填提纲
+              返回提纲步骤
             </Button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -249,7 +265,7 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
           className="w-full justify-center sm:w-auto"
           onClick={onBackToOutline}
         >
-          返回提纲步骤
+          返回上一步
         </Button>
       </div>
 

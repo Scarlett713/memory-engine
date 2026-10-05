@@ -35,9 +35,6 @@ export function HomeDashboard() {
                 <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
                   口述项目工作台
                 </h1>
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-                  新建访谈、续写草稿、打开已建档项目，都在这一页。
-                </p>
               </div>
             </div>
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
@@ -57,6 +56,17 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
     router.replace(`/projects/new?step=${next}`);
   }
 
+  // 返回：basic 步是流程入口，回首页；其余步回上一步。
+  // 回退也走 goToStep（而不是裸 setStep）—— 它同时 router.replace 同步 URL，
+  // 否则地址栏仍停在旧 step，一次刷新就被弹回原来的步骤。
+  function handleBack() {
+    if (step === "basic") {
+      router.push("/");
+      return;
+    }
+    goToStep(step === "outline" ? "basic" : "outline");
+  }
+
   // REQ-21 §5.2：基本信息不是「只活在 React state」，点下一步时写进既有草稿。
   //
   // 必须先读再 merge：saveOutlineDraftToSession 是整体覆盖（outline-session.ts:155-161
@@ -95,13 +105,16 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <Link
-                href="/"
+              {/* 每步左上角的返回入口，文案与落点随步骤切换（basic 回首页 /
+                  outline·route 回上一步）。位置固定在步骤条上方，全流程唯一一个返回按钮。 */}
+              <button
+                type="button"
+                onClick={handleBack}
                 className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
               >
                 <ArrowLeft className="h-4 w-4" />
-                返回工作台
-              </Link>
+                {step === "basic" ? "返回首页" : "返回上一步"}
+              </button>
               <p className="section-eyebrow mt-3">新建项目</p>
               <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
                 新建访谈项目

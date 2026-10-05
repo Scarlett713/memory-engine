@@ -201,9 +201,22 @@ export function InterviewUploadForm() {
 
   // REQ-21 §5.2：基本信息已由新建流程写入草稿的 projectName / intervieweeName，
   // 两项齐了就直接从步骤二开始，不再要求重复填写。缺任一则维持从步骤一开始。
-  const [step, setStep] = useState<WizardStep>(() =>
-    prefill?.profile.projectName && prefill?.profile.intervieweeName ? 2 : 1,
-  );
+  //
+  // REQ-21 / P3：从新建流程的分流步跳进来时，采集路径已在上一步选过（用户点的就是
+  // 「上传音频」），画像也已在基本信息步填过 —— 再让用户点一遍是重复劳动，直接落到
+  // 「音频与提交」。必须同时要求 outline 标记位：裸访问 /upload、老书签、?outline=0
+  // 时 hasOutlineFlag 为 false，逐字走下面的原逻辑，行为零变化。
+  const [step, setStep] = useState<WizardStep>(() => {
+    const ready = Boolean(
+      prefill?.profile.projectName && prefill?.profile.intervieweeName,
+    );
+
+    if (hasOutlineFlag && ready) {
+      return 3;
+    }
+
+    return ready ? 2 : 1;
+  });
 
   // ── Step 1 基础信息 ──────────────────────────────────────
   const [projectName, setProjectName] = useState(
@@ -342,6 +355,14 @@ export function InterviewUploadForm() {
 
     goToStep(step === 3 ? 2 : 1);
   }
+
+  // P3：从新建流程分流步进来的用户没有「upload 内部上一步」的概念 —— 新建流程的步骤
+  // 是 SPA 内部 state，刷新即丢，goBack 只会把人带回 upload 自己的步骤一，与用户的
+  // 来路再无关系。留个按钮只会误导，藏掉。
+  // 只在「步骤三 + 带标记位」这一种组合下藏：用户若自己点步骤条回到步骤二，按钮照常
+  // 出现（那是 upload 内部回退，语义正确）；从步骤二点「下一步」回到步骤三后它会再次
+  // 隐藏 —— 预期行为，用户始终处在「从新建流程进入」的上下文里。
+  const hideBackButton = step === 3 && hasOutlineFlag;
 
   async function submitProject() {
     if (!audioFile) {
@@ -873,7 +894,7 @@ export function InterviewUploadForm() {
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {step > 1 ? (
+            {step > 1 && !hideBackButton ? (
               <Button
                 type="button"
                 variant="secondary"

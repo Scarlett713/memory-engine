@@ -6,6 +6,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   LoaderCircle,
+  LogOut,
   Mic,
   Pause,
   Play,
@@ -529,6 +531,28 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
   const [state, dispatch] = useReducer(interviewReducer, INITIAL_STATE);
   const { phase } = state;
 
+  // P8：退出访谈的二次确认开关。与暂停遮罩是两条独立路径 —— 暂停是「稍后继续」，
+  // 退出是「放弃并回首页」，语义不同，各自持有各自的开关，互不代替。
+  const [isExitOpen, setIsExitOpen] = useState(false);
+
+  // Esc 关闭退出确认，写法照抄本仓既有 modal 先例 OutlineRequiredDialog
+  // （route-chooser.tsx:37-50）。与暂停遮罩的 Esc（= 继续访谈）不会互相干扰：
+  // 暂停遮罩盖住 header 时点不到退出按钮，两个开关无法同时为真。
+  useEffect(() => {
+    if (!isExitOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsExitOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExitOpen]);
+
   // Step 6 上传用。Blob 不可序列化，不进 reducer。
   const wavBlobRef = useRef<Blob | null>(null);
   // 本次会话是否开过录音器（一旦为真就不再回落）。用来区分「录了、在等 onstop」
@@ -920,8 +944,16 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
   }
 
   return (
-    <main className="min-h-dvh px-1 py-1 sm:px-1.5 sm:py-1.5">
-      <div className="flex flex-col gap-2">
+    // P7：min-h-dvh 早就把 main 撑到视口高了，留白的成因不是高度单位，是里面没有
+    // 任何元素去吸收那段富余高度 —— 内容全堆在顶部，余下的 262px 就是用户看到的空白。
+    // 补一条 flex 链即可：main(flex-col) → 包裹 div(flex-1) → section(flex-1) →
+    // 末尾操作行(mt-auto) 沉底。高度单位不动，换成 h-dvh 只会引入内滚裁剪风险且视觉等价。
+    <main className="flex min-h-dvh flex-col px-1 py-1 sm:px-1.5 sm:py-1.5">
+      {/* safe-area 加在包裹层而不是 main：main 已有 py-1 sm:py-1.5，同元素再加 pb-*
+          会顶掉现有底部内边距（Tailwind 输出里 pb 排在 py 之后）。此处是纯增量 ——
+          ⚠️ 当前恒为 0px：layout.tsx 没有 viewport 导出，发出的 meta 缺 viewport-fit=cover，
+          iOS 上 env(safe-area-inset-bottom) 解析为 0。将来补上 viewport 导出即自动生效。 */}
+      <div className="flex flex-1 flex-col gap-2 pb-[env(safe-area-inset-bottom)]">
         <header className="archive-frame paper-panel paper-panel-strong rounded-[1.85rem] px-4 py-4 md:px-5">
           {/* 返回链接的位置与 class 与上传页、项目详情页、提纲工作台保持逐字节一致，
               只改文案与 href —— 四处要看起来是同一个控件。 */}
@@ -932,14 +964,30 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
               <span />
             </div>
 
-            <div>
-              <Link
-                href={`/projects/${project.id}/outline`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                返回提纲
-              </Link>
+            {/* min-w-0 flex-1：父级是 items-start，不给 flex-1 的话本列只占内容宽，
+                右对齐的退出按钮会贴着「返回提纲」而不是贴顶栏右缘。 */}
+            <div className="min-w-0 flex-1">
+              {/* P8：顶栏左「返回提纲」（非破坏，进度保留）右「退出访谈」（放弃，回首页）。
+                  两者语义不同，视觉上也要分得开 —— 退出用 ghost + 弱化色，不与返回抢视线。 */}
+              <div className="flex items-center justify-between gap-3">
+                <Link
+                  href={`/projects/${project.id}/outline`}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  返回提纲
+                </Link>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-interview-exit="trigger"
+                  className="shrink-0 text-muted"
+                  onClick={() => setIsExitOpen(true)}
+                >
+                  <LogOut className="h-4 w-4" />
+                  退出访谈
+                </Button>
+              </div>
               <p className="section-eyebrow mt-3">Step 02 · AI 访谈</p>
               <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
                 {project.projectName}
@@ -952,7 +1000,11 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
           </div>
         </header>
 
-        <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-4 rounded-[1.85rem] p-4 md:p-5">
+        {/* flex-1：.paper-panel 只设 backdrop-filter / background / border / box-shadow /
+            overflow / position，不设任何 flex 属性，所以这个 flex-1 不会被未分层规则吃掉
+            （与 globals.css 那三个坑不同）。它负责把卡片拉到视口底，配合下面末行的
+            mt-auto 让操作按钮沉底。 */}
+        <section className="archive-frame paper-panel paper-panel-strong flex flex-1 flex-col gap-4 rounded-[1.85rem] p-4 md:p-5">
           {phase === "initializing" ? (
             <CenteredLoading>正在准备访谈控制台…</CenteredLoading>
           ) : null}
@@ -1021,7 +1073,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="primary"
@@ -1047,7 +1099,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 {state.currentQuestion || "（等待 AI 提问）"}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="primary"
@@ -1107,7 +1159,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="primary"
@@ -1172,7 +1224,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
               <div className="rounded-[1.4rem] border border-accent-soft bg-accent-soft/40 px-4 py-3 text-sm leading-7 text-accent-strong">
                 {state.errorMessage || "访谈流程出错，请重试。"}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="primary"
@@ -1236,6 +1288,64 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   }}
                 >
                   结束并保存
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* P8：退出访谈的二次确认。与上面的暂停遮罩一样直接写在 <main> 之下，
+          不用 createPortal —— 这里没有 paper-panel / meta-pill 祖先，既没有
+          backdrop-filter 包含块，也没有未分层的 `.paper-panel > * { position: relative }`
+          会压掉 .fixed。暂停遮罩在同一位置正常工作就是现成证据；H9 会实测 computed
+          position === 'fixed' 兜底。
+
+          stopPropagation 必须挂在卡片上，不能挂上面那层 flex h-full 的包裹 div ——
+          它铺满整个遮罩，挂它上面会把「点遮罩关闭」整个吃掉（R5 实测教训）。
+
+          不额外调 stopRecording()：router.push('/') 卸载组件时，
+          use-speech-recorder.ts 的卸载兜底已经 abort 识别并停掉麦克风轨道。 */}
+      {isExitOpen ? (
+        <div
+          data-interview-modal="exit-confirm"
+          className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]"
+          onClick={() => setIsExitOpen(false)}
+        >
+          <div className="flex h-full flex-col items-center justify-center p-2 sm:p-3">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="interview-exit-title"
+              onClick={(event) => event.stopPropagation()}
+              className="paper-panel paper-panel-strong w-full max-w-xl rounded-[2rem] px-4 py-5 md:px-6 md:py-6"
+            >
+              <p className="section-eyebrow">Step 02 · AI 访谈</p>
+              <h2
+                id="interview-exit-title"
+                className="font-display mt-2 text-[1.5rem] font-semibold leading-tight text-accent-strong"
+              >
+                退出访谈
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                退出后本次录音将不会保存，确定要退出吗？
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => setIsExitOpen(false)}
+                >
+                  继续访谈
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-interview-exit="confirm"
+                  onClick={() => router.push("/")}
+                >
+                  确认退出
                 </Button>
               </div>
             </div>
