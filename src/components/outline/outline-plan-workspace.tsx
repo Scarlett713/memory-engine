@@ -79,7 +79,7 @@ type OutlinePlanWorkspaceProps = {
   /**
    * 被 REQ-21 三步流程当作「提纲步」宿主渲染时为 true：
    * 去掉自带的整页外壳（<main> / dvh 高度 / 返回链接与标题块），只留表单与提纲本体。
-   * 默认 false —— 独立路由 /projects/new/outline 的行为逐字不变。
+   * 默认 false —— 独立路由已于 Phase 3 改为 307 跳板；此 flag 控制嵌入式渲染的外壳与按钮差异。
    */
   embedded?: boolean;
   /**
