@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AudioLines,
@@ -113,13 +114,31 @@ function ConsentDialog({
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]">
+  // 必须挂到 body：本组件嵌在 .paper-panel 之内（根元素是 :451 的
+  // `<section className="archive-frame paper-panel paper-panel-strong …">`），而 .paper-panel
+  // 会从两处破坏 fixed ——
+  // (1) backdrop-filter: blur(24px)（globals.css:104）让面板成为 fixed 后代的包含块，
+  //     遮罩于是相对面板而非视口定位；
+  // (2) 未分层的 `.paper-panel > * { position: relative }`（globals.css:125）直接压掉
+  //     Tailwind 的 .fixed —— 后者在 @layer utilities 里，未分层正常声明恒胜过分层声明。
+  // 实测后果：遮罩的计算样式是 relative，inset-0 失效，它退回文档流堆在卡片页脚之后，
+  // 再被 .paper-panel 的 overflow: hidden 裁掉 —— 就是「弹窗出现在页面底部而非覆盖全屏」。
+  // 挂到 body 一次摆脱这两个问题。同一手术见 route-chooser.tsx:56-65（R5）。
+  return createPortal(
+    <div
+      data-upload-modal="consent"
+      className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]"
+      onClick={onCancel}
+    >
       <div className="flex h-full flex-col items-center justify-center p-3 sm:p-5">
+        {/* stopPropagation 必须挂在卡片上，不能挂上面那层包裹 div —— 它是 flex h-full，
+            铺满整个遮罩，挂它上面会把「点遮罩关闭」整个吃掉（R5 实测：点 (6,6) 无效）。
+            点遮罩只当取消、不提交 —— 与弹窗里那个「取消」按钮同义。 */}
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="consent-dialog-title"
+          onClick={(event) => event.stopPropagation()}
           className="paper-panel paper-panel-strong flex w-full max-w-xl flex-col rounded-[2rem] px-4 py-5 md:px-6 md:py-6"
         >
           <div className="flex items-center gap-2">
@@ -179,7 +198,8 @@ function ConsentDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -233,9 +253,13 @@ export function InterviewUploadForm() {
   // profile 里没有「自定义场景名」，所以提纲页选了 custom 的话这里补不了，
   // 由 Step 1 的校验提示用户填 —— 属预期行为。
   const [customScenarioLabel, setCustomScenarioLabel] = useState("");
-  // 标了 ✱ 就必须真的让用户选，所以初值是 null 而不是 "internal"
+  // 默认「内部」：新建流程的画像里没有这个字段，从分流步直落步骤三的用户看不到步骤一的
+  // 单选控件，若初值仍是 null，validateStepOne() 会把他们弹回步骤一（本批修的就是这个）。
+  // "internal" 是本页既有的默认档 —— confidentialityLevelOptions 里它的 description 就写着
+  // 「默认级别。」，getConfidentialityLevelLabel 的兜底也是 ?? "internal"。
+  // 类型保留 | null 是有意的：validateStepOne() 的保守卫与提交前那道 `=== null` 因此零改动。
   const [confidentialityLevel, setConfidentialityLevel] =
-    useState<ConfidentialityLevel | null>(null);
+    useState<ConfidentialityLevel | null>("internal");
   const [notes, setNotes] = useState(() => prefill?.profile.notes ?? "");
 
   // ── Step 1 高级设置 ──────────────────────────────────────
