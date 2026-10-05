@@ -1,12 +1,12 @@
 # REQ-16 首页与新建流程重构 · 实施计划（IMPL）
 
 - **文档定位**：本文是**代码改动计划**，不是 PRD。产品口径见 `docs/PRD_REQ-16_首页与新建流程重构.md`；与 REQ-21 的分工见该 PRD §6。
-- **依据**：`docs/PRD_REQ-16_首页与新建流程重构.md`（288 行，commit `2816582`）、`docs/PRD_REQ-21_新建流程统一.md`、`docs/需求登记表.md` v1.9（REQ-16 = 「PRD 已出，待实施」）。
+- **依据**：`docs/PRD_REQ-16_首页与新建流程重构.md`（288 行，commit `2816582`）、`docs/PRD_REQ-21_新建流程统一.md`、`docs/需求登记表.md` v2.0（REQ-16 / REQ-21 = 「已验收（2026-10-05）」）。
 - **已裁决（2026-10-05）**：`/upload` 保留为上传链路实现路由、降级为非首页入口；`/projects/new/outline` 重定向到 `/projects/new`（PRD §5）。
 - **本批次执行决策**：
   - **D1-A**：REQ-16（首页 IA + 旧路由裁决）与 REQ-21（新建三步流程）**同批交付**，`home-dashboard.tsx` 只改一次（PRD `:201`）。
   - **D2-1**：`/projects/new/outline` → **307 → `/projects/new?step=outline`**，旧书签直接落到「提纲」步骤，CDP 回归面最小。
-- **交付物性质**：本轮只落盘本文档，**不 commit**，等总管验收。
+- **交付物性质**：本文档随 REQ-16 / REQ-21 收口提交一并 commit（2026-10-05）；本轮收口内容与覆盖缺口闭合见 **§9.4**。
 
 ---
 
@@ -258,11 +258,11 @@ export default async function NewProjectPage({
 | --- | --- | --- |
 | basic「下一步」 | `?step=outline` | `router.replace`（不污染历史栈） |
 | basic 表单内容 | 与提纲步共用 React state | **不下沉存储** |
-| outline「确认提纲，进入上传」 | `/upload?outline=1` | 现成逻辑，`outline-plan-workspace.tsx:317`，**不改** |
-| outline「跳过，直接上传」 | `/upload?outline=1` | 现成逻辑，`:331`，**不改**（空提纲 + 画像照带） |
-| outline「进入 AI 访谈」 | `/projects/{id}/interview` | 现成逻辑，`:336+`（REQ-14 D7=B 唯一入口） |
-| route「上传音频」 | `/upload?outline=1` | 承接 `outlineDraftMarkdown` 预填 |
-| route「实时访谈」 | `/projects/{id}/interview` | 同 `handleEnterAiInterview` |
+| outline「确认提纲，下一步」 | `?step=route` | **2026-10-05 修订**：流程内按钮（独立页时代为「确认提纲，进入上传」→ `/upload?outline=1`）；`router.replace` 不污染历史栈 |
+| outline「跳过提纲，下一步」 | `?step=route` | **2026-10-05 修订**：空提纲 + 画像照带（先 `trim` 判空再写草稿，见 §9.4 BUG-07） |
+| ~~outline「进入 AI 访谈」~~ | —— | **2026-10-05 退役**：`embedded` 下不渲染（`outline-plan-workspace.tsx:530/532`），建项目入口改由下行 route 承担（D7=B′） |
+| route「上传音频」 | `/upload?outline=1` | 承接 `outlineDraftMarkdown` 预填；`OUTLINE_FLAG_PARAM` 标志位不能省（`route-chooser.tsx:120-122`） |
+| route「实时访谈」 | `/projects/{id}/interview` | D7=B′ **唯一入口**（`#route-chooser-realtime`，`route-chooser.tsx:125-174`）；无提纲 → 弹 `[data-route-modal="outline-required"]` 引导回填 |
 
 - **持久化只用一处**：`saveOutlineDraftToSession` / `OUTLINE_SESSION_STORAGE_KEY`（`src/lib/outline-session.ts:10-14`）。本流程**不得**引入第二个 key（PRD `:207`）。
 - 直接访问 `/projects/new?step=outline`（无 basic 输入）须可用：提纲步的三个字段是可填的，与 basic 步不构成强依赖。
@@ -473,13 +473,13 @@ export default function LegacyOutlinePage() {
 | R2 | `/projects/new?step=outline` 可直接访问并生成提纲 | §3.4 |
 | R3 | 旧书签 `/projects/new/outline` 最终落到提纲步（非 404） | §4.2 |
 | R4 | 提纲 → 上传的草稿预填不掉（`/upload?outline=1`） | 裁决 `:167` 的代价项 |
-| R5 | `outline-plan-workspace.tsx` 功能零改动（确认 / 跳过 / 进入 AI 访谈三条链路） | §2.6 |
+| R5 | `outline-plan-workspace.tsx` 功能零改动（确认 / 跳过两条链路；**2026-10-05 修订**：「进入 AI 访谈」链路在 `embedded` 下不渲染（`:530/532`），随独立页退役成为不可达分支 —— 已登记，见 §9.4） | §2.6 |
 
 ---
 
 ## 9. 实施顺序、风险与回滚
 
-### 9.1 实施顺序（6 步）
+### 9.1 实施顺序（8 步）
 
 | 步 | 动作 | 产物 / 判据 |
 | --- | --- | --- |
@@ -488,7 +488,9 @@ export default function LegacyOutlinePage() {
 | 3 | REQ-16 生产改动：首页 IA（三区 + 单入口 + 卡片） | §2.1 / §2.2 / §2.3 / §2.4 落地 |
 | 4 | REQ-21 同批：新建 `/projects/new` 三步流程 | §3 落地 |
 | 5 | 重定向 + 内部引用清理 | §4 落地 |
-| 6 | 三脚本断言迁移（`[REQ-16]` 项）+ `measure-375` 重定目标复测 47px | §6 全部落地；三脚本退出码 0 |
+| 6 | 三脚本断言迁移（`[REQ-16]` 项）+ `measure-375` 重定目标复测 47px | §6 全部落地；三脚本退出码 0（2026-10-05 实测：23/23、12/12、10/10） |
+| 7 | Phase 4：账户区槽位注释定稿（47px 三视口实测回填） | `home-dashboard.tsx:45-52` 注释（本次改 `:52` 末行）+ `:53` 数值 `min-h-[47px]`；`measure-375.mjs` **10/10**（375/640/1440 均 47px） |
+| 8 | Phase 5 A3：`persistBasicInfo` 空值覆盖修复 + `verify-phase3` 补 G 段（D7=B′ 主链路断言） | `new-project-flow.tsx:66-84`（**+11 / -3**）；`verify-phase3.mjs` **24/24** |
 
 > 步 3 与步 4 **必须同批**（D1-A）：`home-dashboard.tsx` 只改一次，避免两次改动同一文件（PRD `:201`）。
 
@@ -512,13 +514,31 @@ export default function LegacyOutlinePage() {
 
 ---
 
+### 9.4 收口登记（2026-10-05）
+
+**本轮收口的代码改动（Phase 4 / Phase 5-A3）**：
+
+| # | 文件 | 改动 | 依据 / 断言 |
+| --- | --- | --- | --- |
+| P4 | `src/components/home/home-dashboard.tsx:52` | 账户区槽位注释定稿（注释块 `:45-52` 的末行；徽标槽位数值 `min-h-[47px]` 在 `:53` 未变）—— 47px 经 `measure-375.mjs` 三视口复测确认，含徽标到货不撑高 | PRD §10 ⑥；`measure-375.mjs` 10/10 |
+| P5-A3 | `src/components/new-project/new-project-flow.tsx:66-84` | `persistBasicInfo` 先 `trim` 再判空、只写用户真填的字段（**+11 / -3**），修 BUG-07 冷启动空值覆盖 | 登记表 BUG-07；`verify-phase3.mjs`「A3 修复」断言 |
+
+**覆盖缺口的补记与闭合（方案 D）**：
+
+- **缺口**：Phase 3 把 AI 入口从提纲页移入分流步后，`tmp/verify-phase2.mjs` §13 原「提纲页点 AI → 建项目 → 落 `/projects/{id}/interview`」断言失去对象（`embedded` 下 AI 按钮不渲染），**D7=B′ 主链路一度零断言覆盖**。
+- **闭合**：`tmp/verify-phase3.mjs` 新增 **G 段**（第 24 条断言）——「有提纲 + 已填基本信息 → 点 `#route-chooser-realtime` → `POST /api/projects/ai-interview` **201** → 落 `/projects/{id}/interview`」，并校验 payload 契约（`researchFocus` / `notes` 直传 `#overview`、`outlineDraftMarkdown` 原样直传）与探针项目清理（id 只取响应体，`DELETE` 200）。不依赖 LLM：进分流步后直接注入提纲草稿；「确认提纲 → 分流步」的过渡由 E2 段覆盖。
+- **`tmp/verify-phase2.mjs` 的处置**：其 6 条 FAIL 中 4 条属「旧口径已被 Phase 3 取代」（旧独立页 h1 / eyebrow / 三按钮、首页指向旧路由），2 条系**旧探针自身缺陷**（`:985` 用 `/\/projects\/([^/]+)/` 把 `/projects/new` 的 `new` 当项目 id；`click()` 不检查 `disabled`，落在早退分支即静默无操作且无报错）。**不列入转绿清单**，其有效断言已被 `verify-phase3` 覆盖 —— 判定为「Phase 2 历史探针、已退役」，**非产品回归**。
+- **环境注意（实测结论）**：dev server 的 HMR 全量重载会冲掉 CDP 流程的中间态，表现为「POST 200/201 但路径未变、且无报错」；跑探针前须等重建安定，否则结论不可用。
+
+**上游欠账（不在本轮范围）**：`interview/page.tsx:26-28` 在项目无提纲时 `redirect('/projects/{id}/outline')`，而该路由不存在（PRD-21 §10 ⑤ / §11-4）。正常路径不命中（AI 分支经 API 强制提纲），保持「已知遗留」。
+
 ## 10. 待办与交接清单
 
 | 项 | 归属 | 说明 |
 | --- | --- | --- |
 | 首页新建 CTA 文案定稿（「新建访谈」） | 产品方 | PRD §10 ②；改文案须同步 §6 文案断言 |
 | 卡片当前阶段展示粒度 | 产品方 | PRD §10 ④；本计划取「仅当前一步」 |
-| 47px 占位最终取值 | 实施 | PRD §10 ⑥；**本轮交付，非外置**——由 §9 步 6 实测回填 |
+| 47px 占位最终取值 | 实施 | PRD §10 ⑥；**✅ 已回填（2026-10-05）**：三视口实测均为 47px，见 §9 步 7 / §9.4 |
 | 草稿区能力（列表 / 摘要 / 继续填写 / 更新时间） | REQ-15 | PRD §7 接口契约；本批次只落空态 |
 | `cdp-req13-prefill.mjs` 失效修复 | 实施（`[基线]`） | PRD `:226`；与 §6 的 UI-12 遗留修复**建议同批**，但**不计入 REQ-16 功能验收证据** |
 | REQ-17 管理入口是否需首页占位 | 产品方 | PRD §10 ⑤；本批次明确不占位 |

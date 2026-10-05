@@ -1,14 +1,14 @@
 # REQ-14 PRD：AI 辅助访谈（AI 主访 + 实时侧写）
 
-- 版本：v1.4
+- 版本：v1.5
 - 编制日期：2026-10-03
-- 版本变更：v1.1（交互方式待确认、情绪提示口径修正）→ v1.2（D2=A AI 主访已选定；PRD 正文待按方案 A 改稿）→ **v1.3（2026-10-03 正文按 D2=A 重写：AI 逐问与追问、情绪暂停恢复、写作规则插槽；302→307 措辞修正）** → **v1.4（2026-10-03：两份 prompt 模板落盘 `src/lib/writing-rules.ts` / `src/lib/interview-prompt.ts`；§11.5.1 最小解冻 1 行插槽；§9-H 一票否决本期口径；§13 新增 2 项待确认）**
+- 版本变更：v1.1（交互方式待确认、情绪提示口径修正）→ v1.2（D2=A AI 主访已选定；PRD 正文待按方案 A 改稿）→ **v1.3（2026-10-03 正文按 D2=A 重写：AI 逐问与追问、情绪暂停恢复、写作规则插槽；302→307 措辞修正）** → **v1.4（2026-10-03：两份 prompt 模板落盘 `src/lib/writing-rules.ts` / `src/lib/interview-prompt.ts`；§11.5.1 最小解冻 1 行插槽；§9-H 一票否决本期口径；§13 新增 2 项待确认）** → **v1.5（2026-10-05：D7=B′ 口径同步 —— AI 实时访谈唯一入口移入流程内分流步（`#route-chooser-realtime`）；提纲在流程内可跳过、AI 分支须有提纲且校验点在 API 层（不放宽契约）；§2.1 主链路、§9-A、§9-G、§11.4、§11.5.1、§13 同步互引；随 REQ-16 Phase 3 / REQ-21 验收同批落地）**
 - 语言：中文（工程导向）
 - 关联：REQ-13（提纲生成与对话细化，已实现）、REQ-11、REQ-15（草稿箱，候选）、REQ-16（首页与新建流程重构，候选）、REQ-17（后台编辑管理入口，候选）、REQ-18（脱敏规则体系，候选）、REQ-19（用户反馈通道 / 稿件返修，候选）、REQ-20（成文稿导出 PDF，候选）、UI-07（处理台情绪提示定位修正）
 - **交互方式：D2=A AI 主访（AI 直接主访受访者）—— 任 2026-10-03 确认，方案 A「✅ 已选定」（见 §0.1）**；接受文本模型（deepseek-v4-flash）单轮 3-10s 延迟，**中期不要求实时语音模型**。本稿正文（§1 ~ §9）已按方案 A（AI 主访）重写（v1.3，2026-10-03）；方案 B 仅作历史记录（见 §0.1）。
 - 已拍板决策：
   - D1=C 表单为主、对话细化｜**D2=A AI 主访（2026-10-03 语义修订，原注「人主持 + AI 侧写」作废）**｜D3=A Web Speech 实时识别 + 结束后讯飞归档
-  - D4=A 仅音频｜D5=B 仅 AI 访谈强制提纲｜D6=A TTS 默认关、可开｜D7=B 确认提纲后进项目
+  - D4=A 仅音频｜D5=B 仅 AI 访谈强制提纲｜D6=A TTS 默认关、可开｜**D7=B′ 流程内分流步选「AI 实时访谈」时须有提纲（提纲在流程内可跳过；空提纲由分流步弹引导回填，契约校验点仍在 API 层）—— 2026-10-05 随 REQ-16 Phase 3 修订，原注「确认提纲后进项目」作废**
   - D8=C 情绪提示规则为主、LLM 抽样增强
 - 情绪提示定位修正（任，2026-10-03）：**给后台编辑看、只关注负面情绪、只标注事实不给建议**；REQ-14 新增 sidecar 出参**去掉 `guidance` 字段**。存量处理台 / 导出的联动改动归 UI-07，见 §0 第 9 条
 
@@ -54,9 +54,10 @@
 
 ### 2.1 主链路（Happy path）
 
-1. **提纲工作台** `/projects/new/outline`：填画像 → 生成提纲 → 对话细化（REQ-13 已实现）。
-2. **D7=B 建项目**：点「进入 AI 访谈」→ `POST /api/projects/ai-interview` 创建项目（`collectionPath="ai_interview"`，**此刻无音频**）→ 拿到 `projectId` → 跳 `/projects/{projectId}/interview`。
-   - 注：既有「确认提纲，进入上传」按钮**保持不变**（走 REQ-13 原链路），新增的 AI 访谈入口与之并列。
+1. **新建三步流程** `/projects/new`（REQ-21）：基本信息 → 提纲（可跳过）→ 分流。提纲步内嵌 REQ-13 的提纲工作台（填画像 → 生成提纲 → 对话细化）；**独立路由 `/projects/new/outline` 已退役为 307 跳板**，最终落到 `/projects/new?step=outline`。
+2. **D7=B′ 建项目**：在**流程内分流步**点「AI 实时访谈」（`#route-chooser-realtime`）→ `POST /api/projects/ai-interview` 创建项目（`collectionPath="ai_interview"`，**此刻无音频**）→ 拿到 `projectId` → 跳 `/projects/{projectId}/interview`。
+   - 注 1：分流步另一卡「上传音频」承接 REQ-13 原链路（`/upload?outline=1`，提纲草稿照带）；流程内提纲步按钮为「确认提纲，下一步」/「跳过提纲，下一步」，**独立页时代的三按钮形态（确认 / 跳过 / 进入 AI 访谈）随该页退役**。
+   - 注 2（2026-10-05，D7=B′）：**AI 实时访谈的唯一入口在流程内分流步**。提纲是流程内的可选步骤，但选 AI 分支时须有提纲 —— 空提纲时由分流步弹 `[data-route-modal="outline-required"]` 引导回填；**API 契约不放宽**（`ai-interview/route.ts:137-138` 仍强制 `outlineDraftMarkdown` 非空）。
 3. **访谈控制台 · 准备态**：展示项目信息摘要、**当前问题区**与提纲 checklist；勾选知情同意；点「检测设备」（麦克风权限 + 实时字幕能力探测）。
 4. **开始访谈**：点「开始录音」→ 同时启动 ①音频采集（Web Audio 采集 PCM）②Web Speech 实时识别；**AI 读取已确认提纲，取第 1 个问题**。
 5. **AI 逐问循环**（每问一拍；并行产出情绪提示与 AI 侧写）：
@@ -316,8 +317,9 @@ if (!token) {
 
 ### A. 流程与接口
 
-1. 提纲工作台点「进入 AI 访谈」→ 生成项目（`collectionPath="ai_interview"`、`audioFileName=""`）→ 落在 `/projects/{id}/interview`。
-2. 既有「确认提纲，进入上传」按钮行为不变（回归通过）。
+1. 流程内分流步点「AI 实时访谈」→ 生成项目（`collectionPath="ai_interview"`、`audioFileName=""`）→ 落在 `/projects/{id}/interview`（2026-10-05：入口由提纲工作台移入分流步，D7=B′）。
+2. 分流步「上传音频」行为不变（回归通过，`/upload?outline=1`）；流程内提纲步的「确认提纲，下一步」/「跳过提纲，下一步」与独立页时代的确认 / 跳过语义等价（回归通过）。
+   - 补充（2026-10-05，D7=B′）：空提纲时点「AI 实时访谈」**不发起建项目请求**，改弹 `[data-route-modal="outline-required"]` 引导回填；有提纲时建项目成功并落到 `/projects/{id}/interview`（由 `tmp/verify-phase3.mjs` G 段断言覆盖）。
 3. 结束访谈后 `POST .../interview/audio` 返回 200；项目详情「受访音频」显示 `interview-{id}.wav`，`workflow.upload = completed`。
 4. 归档触发后状态依次 `transcribing → ai_refining → manual_review`，处理台可见；docx / txt / json 三格式导出**全部回归通过**（导出 API 零改动）。
 5. 未登录 `POST /api/projects/ai-interview` → **401 JSON**（非 307）。
@@ -360,7 +362,7 @@ if (!token) {
 ### G. 回归与布局
 
 25. 原「音频上传」链路（`/upload`）与 REQ-13 提纲预填、`?outline=1` 草稿带入**全部回归通过**。
-26. `tmp/cdp-req13-outline.mjs`（含 13-E 首页两入口断言）、`tmp/cdp-req13-crosscut.mjs`、`tmp/measure-375.mjs`（375px header 高度基线）**全部保持通过**（因首页与上传页未改动）。
+26. `tmp/cdp-req13-outline.mjs`、`tmp/cdp-req13-crosscut.mjs`、`tmp/measure-375.mjs`（375px header 高度基线）**全部保持通过**；REQ-16 的三脚本断言迁移由 `tmp/verify-phase3.mjs` 承接（2026-10-05：原 23 条全绿，并补 G 段「有提纲 → 点 AI 实时访谈 → 建项目并落 `/projects/{id}/interview`」，共 **24/24**）。
 
 ### H. 一票否决项的本期口径（05 交付文本标准）
 
@@ -433,7 +435,7 @@ if (!token) {
 | --- | --- | --- |
 | `src/proxy.ts` | BUG-06：`/api/*` 未登录 / 失效返 401 JSON，页面仍 307 | §8.2 |
 | `src/app/api/projects/route.ts` | 删除本地 `parseEnumValue` 与常量（迁至 `enum.ts` 后导入）；`:108-110` `collectionScenario`、`:113-115` `privacyLevel` 改用 `parseEnumValue` | §8.1 |
-| `src/components/outline/outline-plan-workspace.tsx` | 「确认提纲」处新增「进入 AI 访谈」分支 → 调 `ai-interview` 建项目 → 跳控制台；既有「确认提纲，进入上传」按钮不变 | D7=B |
+| `src/components/outline/outline-plan-workspace.tsx` | 「确认提纲」处新增「进入 AI 访谈」分支 → 调 `ai-interview` 建项目 → 跳控制台；既有「确认提纲，进入上传」按钮不变 | D7=B → **2026-10-05 修订（D7=B′）**：该文件在流程内以 `embedded` 复用，AI 分支按钮在 `embedded` 下不再渲染（`outline-plan-workspace.tsx:530/532`），建项目入口改由分流步承担（`route-chooser.tsx:125-174`，`#route-chooser-realtime`）；文件既有确认 / 跳过链路零删除 |
 
 ### 11.5 明确不修改
 
@@ -452,7 +454,7 @@ if (!token) {
 > 已核验（2026-10-03）：`git diff --numstat` 分别为 `1/0`、`1/0`、`2/0`（纯新增、零删除）；`writingRules` 未传时整理 prompt 与现状逐字一致（既有 9 条 requirement 不变）。
 > 说明：本次解冻只动 provider 的输入契约（`LlmRefineInput.writingRules`）；**未触碰 §0 第 2 条「不改数据层」**：`ProjectRecord` / `project-store.ts` / `storage.ts` 零改动（`types/project.ts` 仅被读取类型，未被修改）。
 
-> 说明：上传页 Step 2 的「AI 访谈」卡片是硬编码 `disabled`（`interview-upload-form.tsx:662`），且该表单提交链路强制要求音频文件（`src/app/api/projects/route.ts:151-156`）。本期**保持 disabled 与「即将开放」文案不变**，AI 访谈入口唯一在提纲工作台；上传页与首页的入口重构统一交给 REQ-16。
+> 说明：上传页 Step 2 的「AI 访谈」卡片是硬编码 `disabled`（`interview-upload-form.tsx:662`），且该表单提交链路强制要求音频文件（`src/app/api/projects/route.ts:151-156`）。本期**保持 disabled 与「即将开放」文案不变**（2026-10-05 复核：REQ-16 / REQ-21 落地后该卡片口径未变）。AI 访谈入口**唯一在流程内分流步**（**D7=B′，2026-10-05 修订 —— 原「唯一在提纲工作台」随 REQ-16 Phase 3 作废**）；上传页与首页的入口重构已由 REQ-16 收口。
 
 ### 11.6 新增（验收脚本）
 
@@ -492,8 +494,8 @@ if (!token) {
 2. ~~**PRD 正文按方案 A 改稿的范围与排期**（现正文 §1 ~ §9 仍为原方案 B 卷）~~ —— **✅ 已实施（v1.3，2026-10-03）**：AI 提问编排与追问上限、TTS 朗读口径、情绪暂停与恢复、写作规则插槽（§6.3）、§10 已作废条目重写均已在正文落地。
 3. **情绪提示最终展示位置**：「给后台编辑看、不展示给前端用户」与「访谈中提示主持人是否暂停」需明确分工或二者取一；默认口径为控制台保留中性提示、后台编辑视角随 REQ-17 落地。存量处理台 / 导出的联动改动属 **UI-07**，需裁决 §0.2 / §0.4 是否解冻。
 4. `confidentialityLevel` 建项目时默认 `internal`、不弹确认窗；控制台只读展示。事后修改需 UI 入口（本期不做）。
-5. REQ-14 入口唯一在提纲工作台；首页与上传页不动，等 REQ-16 统一重构。
-6. REQ-16 与 REQ-14 的排期顺序：本 PRD 假设 REQ-14 先行、REQ-16 后续重构入口。
+5. ~~REQ-14 入口唯一在提纲工作台；首页与上传页不动，等 REQ-16 统一重构。~~ —— **✅ 已收口（2026-10-05）：唯一性改为「流程内分流步唯一」（D7=B′）；首页收敛为单入口、上传页「AI 访谈」卡片保持 `disabled`，REQ-16 / REQ-21 已验收。**
+6. ~~REQ-16 与 REQ-14 的排期顺序：本 PRD 假设 REQ-14 先行、REQ-16 后续重构入口。~~ —— **✅ 已按此顺序执行完毕（2026-10-05）：REQ-14 先行、REQ-16 Phase 3-5 后续重构入口，无返工。**
 7. **v1.3 新增待确认项**：① 写作规则文档最终清单（§6.3 列出的 3 个 docx 是否全用、禁用词表是否单独成表）；② 情绪暂停的形态（已按 §3 模块 4 复用 `paused` 态实现，是否需要独立暂停页）；③ 同一题连续追问上限 2 次是否需要可配置。
 8. ~~**写作规则文档最终清单**~~ —— **✅ 已定稿（2026-10-03）**：03（语言规范）+ 05（内容标准）+ 07（5 类模板章节骨架）三份全用，落盘为 `src/lib/writing-rules.ts`（`WRITING_RULES_TEMPLATE` + `OUTLINE_WRITING_TEMPLATES`）；05 的「禁用词表」并入【语言规范】节、不单独成表；同一题追问上限**固定 2 次、不做配置**（`MAX_FOLLOW_UP_COUNT = 2`，路由侧硬强制）。
 9. **07 元信息 12 项（共用要素齐全率）本期不可达**：07 模板的元信息 12 项属**导出封面**职责，导出 API 本期零改动（§11.5），故 05 的「共用要素齐全率 100%」本期不验；建议随 **UI-07** 统一处理导出侧模板渲染（含 §9-H 第 2、3 条）。

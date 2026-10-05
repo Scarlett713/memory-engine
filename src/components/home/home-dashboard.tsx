@@ -49,7 +49,7 @@ export function HomeDashboard() {
                   REQ-16 把两个新建 CTA 迁进「新建」区后，本列只剩槽位一项：
                   无徽标时槽位被 min-h 撑到 47px；徽标到货后内容高 47px，max(47, 47) 不生长。
                   单子元素不产生 gap-3 的子项间距，故跳变量为 0，全断点中性。
-                  47 仍是徽标实测高度，数值待 measure-375.mjs 复测后定稿。 */}
+                  47 已由 measure-375.mjs 复测定稿（Phase 4，三视口一致）。 */}
               <div className="min-h-[47px]">
                 {user ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 sm:justify-start">

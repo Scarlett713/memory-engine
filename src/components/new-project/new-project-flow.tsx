@@ -66,12 +66,20 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
   function persistBasicInfo(next: BasicInfo) {
     const existing = readOutlineDraftSession();
 
+    // 冷启动直达 /projects/new?step=outline（老书签 → 307 跳板）时 basicInfo 仍是
+    // EMPTY_BASIC_INFO，无条件写入会把提纲步刚写下的三个字段清成空字符串。
+    // 因此只覆盖用户真填了的字段，其余沿用草稿里的既有值。
+    // 先 trim 再判空：'   ' 这种全空白等同于没填，同样不该顶掉旧值。
+    const projectName = next.projectName.trim();
+    const intervieweeName = next.intervieweeName.trim();
+    const notes = next.overview.trim();
+
     saveOutlineDraftToSession(existing?.outlineMarkdown ?? "", {
       ...existing?.profile,
-      projectName: next.projectName.trim(),
-      intervieweeName: next.intervieweeName.trim(),
+      ...(projectName ? { projectName } : {}),
+      ...(intervieweeName ? { intervieweeName } : {}),
       // IMPL §3.3 裁决：描述信息 → notes；researchFocus 不由基本信息写入。
-      notes: next.overview.trim(),
+      ...(notes ? { notes } : {}),
     });
   }
 
