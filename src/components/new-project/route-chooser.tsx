@@ -255,18 +255,14 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
         </div>
       ) : null}
 
+      {/* 本组件不再渲染自己的「返回上一步」：header 里那个（new-project-flow.tsx:110-117）
+          走同一个落点（step 3 → step 2），同屏两个同文案返回入口违反
+          new-project-flow.tsx:108 的「全流程唯一一个返回按钮」（P1 裁决）。
+          onBackToOutline 保留，由下面的 OutlineRequiredDialog 消费。 */}
       <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-muted">
           提纲留空也可以直接上传音频。
         </p>
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full justify-center sm:w-auto"
-          onClick={onBackToOutline}
-        >
-          返回上一步
-        </Button>
       </div>
 
       <OutlineRequiredDialog
