@@ -115,14 +115,9 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
                 <ArrowLeft className="h-4 w-4" />
                 {step === "basic" ? "返回首页" : "返回上一步"}
               </button>
-              <p className="section-eyebrow mt-3">新建项目</p>
               <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
-                新建访谈项目
+                新建项目
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-                填好基本信息，生成一版访谈提纲，再选择用 AI
-                实时访谈还是上传音频。
-              </p>
 
               {/* 步骤条纯展示、不可点：可点会绕过基本信息校验（PRD §9-2
                   「必填未过时不能进入任一分支」）。前进只能走各步自己的按钮。 */}

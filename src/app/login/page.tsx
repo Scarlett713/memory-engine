@@ -51,7 +51,7 @@ function LoginForm() {
           >
             记忆引擎
           </h1>
-          <p className="text-sm text-stone-500">口述历史采集与整理工作台</p>
+          <p className="text-sm text-stone-500">AI赋能口述式抢救与文化传承</p>
         </div>
 
         {reason === 'expired' && (

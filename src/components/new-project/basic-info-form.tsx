@@ -30,7 +30,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
     event.preventDefault();
 
     if (!value.projectName.trim() || !value.intervieweeName.trim()) {
-      setError("请先填写访谈主题与受访者姓名。");
+      setError("请先填写访谈主题与受访对象。");
       return;
     }
 
@@ -47,13 +47,9 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
       className="archive-frame paper-panel paper-panel-strong flex flex-col gap-5 rounded-[1.85rem] p-4 md:p-5"
     >
       <div>
-        <p className="section-eyebrow">基本信息</p>
-        <h2 className="font-display mt-2 text-[1.35rem] font-semibold text-accent-strong">
-          先说说这次访谈
+        <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
+          基本信息
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          访谈主题与受访者姓名是必填的，AI 生成提纲要知道「聊什么」和「关于谁」。描述信息可以留空。
-        </p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -76,7 +72,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
 
         <div>
           <label className="field-label" htmlFor="intervieweeName">
-            受访者姓名
+            受访对象
             <span className="ml-1 text-red-500">*</span>
           </label>
           <input
@@ -87,7 +83,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
             onChange={(event) =>
               onChange({ ...value, intervieweeName: event.target.value })
             }
-            placeholder="例如：王阿婆"
+            placeholder="例如：受访者姓名"
           />
         </div>
 

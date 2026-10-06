@@ -94,7 +94,7 @@ export function HomeDashboard() {
               className="sidebar-cta mt-auto w-full px-5"
             >
               <Plus className="h-4 w-4" />
-              新建访谈
+              新建项目
             </Link>
           </div>
 
@@ -110,7 +110,7 @@ export function HomeDashboard() {
             <div className="surface-card rounded-[1.5rem] p-5">
               <p className="text-sm font-semibold text-accent-strong">暂无草稿</p>
               <p className="mt-2 text-sm leading-6 text-muted">
-                新建访谈后未提交的内容会出现在这里，可随时继续填写。
+                新建项目后未提交的内容会出现在这里，可随时继续填写。
               </p>
             </div>
           </div>

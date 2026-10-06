@@ -112,7 +112,7 @@ export function RecentProjectList({
                 <p className="text-sm font-semibold">暂无项目</p>
               </div>
               <p className="mt-3 text-sm leading-6 text-muted">
-                点上方「新建访谈」开始建档，完成后项目会出现在这里。
+                点上方「新建项目」开始建档，完成后项目会出现在这里。
               </p>
             </div>
           ) : null}
