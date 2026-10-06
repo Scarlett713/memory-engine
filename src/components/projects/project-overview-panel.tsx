@@ -46,7 +46,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             </p>
           </div>
           <div className="surface-card rounded-[1.3rem] px-4 py-4">
-            <span className="section-eyebrow">主题关键词</span>
+            <span className="section-eyebrow">关键词</span>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-foreground">
               <Tags className="h-5 w-5 text-accent-strong" />
               {project.keywords.length}
@@ -93,11 +93,11 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-foreground">脱敏级别</dt>
+              <dt className="font-medium text-foreground">隐私处理级别</dt>
               <dd>{getPrivacyLevelLabel(project.privacyLevel)}</dd>
             </div>
             <div>
-              <dt className="font-medium text-foreground">脱敏规则</dt>
+              <dt className="font-medium text-foreground">隐私处理规则</dt>
               <dd>
                 {project.customRedactionRules.map(getRedactionRuleLabel).join("、") ||
                   "未设置"}

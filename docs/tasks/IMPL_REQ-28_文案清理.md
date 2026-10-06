@@ -173,23 +173,24 @@
 | E-08 | `lib/types/project.ts` — `PROCESS_STEPS[2].description`「完成摘要、结构化整理、情绪提示与隐私脱敏。」 | 删除 | 同 E-04 守卫说明 |
 | E-09 | `lib/types/project.ts` — `PROCESS_STEPS[3].description`「研究员进行复核，并决定是否进入成果导出。」 | 删除 | 同 E-04 守卫说明 |
 | E-10 | `lib/types/project.ts` — `PROCESS_STEPS[4].description`「生成可归档的 docx、txt 和结构化 JSON 成果。」 | 删除 | 同 E-04 守卫说明 |
-| E-11 | `src/components/projects/project-processing-console.tsx` — 小标题「上传即处理」 | 删除 | 与「处理进度」标题语义重复（R5） |
+| E-11 | `src/components/projects/project-processing-console.tsx` — 小标题「上传即处理」 | 删除 | 与「处理进度」标题语义重复（R5）；**本批授权 className**：`:1062` `mt-2` → `mt-3`（Q-1，全批唯一 className 改动） |
 | E-12 | `project-processing-console.tsx` — 空态 / 说明「上传完成后，系统会自动生成…立即开始整理。」 | 替换 →「处理中，完成后可查看结果」 | R2 反例句 |
-| E-13 | `project-processing-console.tsx` — 按钮「重新生成整理结果」 | 替换 →「重新生成」 | 与弹窗确认语同屏，勿改弹窗文案（保留项） |
-| E-14 | `project-processing-console.tsx` — 审核提示卡标题「AI 整理已完成 · 请确认审核结果」 | 替换 →「整理完成，请确认」 | |
-| E-15 | `project-processing-console.tsx` — 审核提示卡说明「点击下方打开整理结果…解锁导出。」 | 替换 →「确认无误后即可导出」 | |
-| E-16 | `project-processing-console.tsx` — 审核状态按钮「请先在整理结果中处理（还剩 3 处待确认）」 | 替换 →「还有 3 处待确认」 | 处数由数据拼接 → 改模板字面 |
-| E-17 | `project-processing-console.tsx` — 结果摘要卡枚举句 | 替换 →「包含转写稿、摘要与结构化档案」 | 与 E-19 模块名同源，实施时保持口径一致 |
+| E-13 | `project-processing-console.tsx` — 按钮「重新生成整理结果」 | 替换 →「重新生成」 | 与弹窗确认语同屏，勿改弹窗文案（保留项）；同屏另一支「立即开始整理」→「开始整理」同批（Q-2，`console:1077` 三元两支一次改净） |
+| E-14 | `project-processing-console.tsx` — 审核提示卡标题「AI 整理已完成 · 请确认审核结果」 | 替换 →「整理完成，请确认」 | PRD 现状列「请确认**审核**结果」系笔误、代码实为「审校」→ **「审校」不改**（Q-3）；追加 `:1205`「整理结果已生成」→「整理完成」 |
+| E-15 | `project-processing-console.tsx` — 审核提示卡说明「点击下方打开整理结果…解锁导出。」 | 替换 →「确认无误后即可导出」 | 追加 xl 变体 `:1111` 同批（Q-4）：两端口径统一为「确认无误后即可导出」 |
+| E-16 | `project-processing-console.tsx` — 审核状态按钮「请先在整理结果中处理（还剩 3 处待确认）」 | 替换 →「还有 N 处待确认」 | PRD 记 1 处，**实测 5 处 / 3 形态**（Q-5；行号＝HEAD `9518ee7` 改前实测）：`:1145`/`:1247` 长串「还有 N 处待确认」、`:1148`/`:1250` 短串「N 处待确认」、`:1297` 浮层模板串；连带「完成审校，解锁导出」→「完成审校」3 处（`:1152`/`:1254`/`:1299`） |
+| E-17 | `project-processing-console.tsx` — 结果摘要卡枚举句 | 替换 →「包含原始转写稿、摘要与档案」 | 与 E-19 模块名同源（本 IMPL-E 单 §1.5-⑦ 定稿字面）；`console:1208` 改后为 `:1204` |
 | E-18 | `project-processing-console.tsx` — 结果查看页说明「更适合通读长文本；按 Esc 也可以关闭。」 | 删除 | 原为「移到帮助」→ 降级删除；帮助批次回填（§5.6） |
-| E-19 | `project-processing-console.tsx` — 结果模块标题（脱敏整理稿 / 要素标引 / 结构化档案 / 口述摘要 / 主题关键词 / 情绪提示 / 脱敏提示 / 原始转写稿）＋ `src/components/projects/timeline-panel.tsx` —「要素标引」（2 处） | 替换 → 整理稿 / 时间线 / 档案 / 摘要 / 关键词 / 情绪提示 / 隐私处理 / 原始转写稿 | P-4（脱敏 → 隐私处理）；**模块名须与实际模块一一对应**，逐模块核对、勿机械替换；同词在 `lib/server/project-export.ts`（「要素标引」×2、「脱敏整理稿」×2）→ **不动**（0.2-D4） |
-| E-20 | `src/lib/writing-rules.ts` — 结构化档案小节占位「本节内容在本次访谈中未涉及。」 | 替换 →「本小节暂无内容」 | **授权改字面量**（0.2-D2）；该文件同时含「记忆引擎」→ **那一处不动**（§0.1 第二表） |
+| E-19 | `project-processing-console.tsx` — 结果模块标题（脱敏整理稿 / 要素标引 / 结构化档案 / 口述摘要 / 主题关键词 / 情绪提示 / 脱敏提示 / 原始转写稿）＋ `src/components/projects/timeline-panel.tsx` —「要素标引」（2 处） | 替换 → 整理稿 / 时间线 / 档案 / 摘要 / 关键词 / 情绪提示 / 隐私处理 / 原始转写稿 | P-4（脱敏 → 隐私处理）；**模块名须与实际模块一一对应**，逐模块核对、勿机械替换；**「要素标引」保留**（Q-6：命名权属 UI-18，`timeline-panel.tsx` 零改动）；「脱敏提示 → 隐私处理」接受（Q-7）；连带 `overview-panel:49`（主题关键词 → 关键词）、`:96`/`:100`（脱敏级别/规则 → 隐私处理级别/规则）、`console:269` 空态（Q-8 / Q-12）；同词在 `lib/server/project-export.ts`（「要素标引」×2、「脱敏整理稿」×2）→ **不动**（0.2-D4） |
+| E-20 | `src/lib/writing-rules.ts` — 结构化档案小节占位「本节内容在本次访谈中未涉及。」 | **移出本批**（Q-9：`writing-rules.ts:186` 系 LLM system prompt 正文，属 0.2-D4 生成侧禁动面 → 零改动）；**UI 侧落点 `console:686` 本批已改**为「本小节暂无内容」（2026-10-07 第四项终裁，改后 `:683`） |
 | E-21 | `project-processing-console.tsx` — 情绪提示空态「该采集路径暂不提供情绪提示。」 | 替换 →「暂无情绪提示」 | |
-| E-22 | `project-processing-console.tsx` — 脱敏提示统计「共 3 处 · 待确认 3 · 已确认 0 · 已撤销 0 · 待核实 0」 | 替换 →「共 3 处，待确认 3」 | 数字拼接；删去 3 个零值项 |
-| E-23 | `project-processing-console.tsx` — 筛选标签「全部 3 / 仅看待确认 3 / 仅看存疑 0」 | 替换 →「全部 / 待确认 / 存疑」 | 计数是否保留由实施人按同屏空间决定，**须与 E-22 口径一致** |
-| E-24 | `project-processing-console.tsx` — 批量操作按钮「批量确认 3 项（不含存疑）」 | 替换 →「全部确认」 | |
-| E-25 | `project-processing-console.tsx` — 条目原因字段「原因：普通个人姓名 / 原因：个人手机号 / 原因：受访者居住地址信息」 | 替换 →「类型：姓名 / 类型：手机号 / 类型：住址」 | 三处字面同改 |
-| E-26 | `project-processing-console.tsx` — 原始转写稿说明「讯飞原始转写，供与整理稿对照；默认收起」 | 替换 →「原始转写稿」 | 与 UI-08 / UI-17（转写稿文案）同面，须定主从 |
-| E-27 | `project-processing-console.tsx` — 「按 Esc 也可以关闭」「默认收起」等界面行为说明 | 随帮助批次 | E-18 本批已删、E-26 本批已替换 → 本行**不另生动作**，仅登记 |
+| E-22 | `project-processing-console.tsx` — 脱敏提示统计「共 3 处 · 待确认 3 · 已确认 0 · 已撤销 0 · 待核实 0」 | 替换 →「共 N 处，待确认 N」 | Q-11 方案 a：数字拼接、删 3 个零值项；`console:536–537` 两行收为一行（改后 `:534`） |
+| E-23 | `project-processing-console.tsx` — 筛选标签「全部 3 / 仅看待确认 3 / 仅看存疑 0」 | 替换 →「全部 / 待确认 / 存疑」 | Q-11 方案 a：**计数保留**（`:555` `{option.label} {filterCounts[option.value]}` 不动）；与 E-22 口径一致 |
+| E-24 | `project-processing-console.tsx` — 批量操作按钮「批量确认 3 项（不含存疑）」 | 替换 →「全部确认」 | Q-11 方案 a：去数字（`:579`）；`:571` `disabled` 逻辑与 `:500` 错误提示不动 |
+| E-25 | `project-processing-console.tsx` — 条目原因字段「原因：普通个人姓名 / 原因：个人手机号 / 原因：受访者居住地址信息」 | 替换 →「类型：…」 | Q-10 方案 a：**代码落点仅前缀「原因：」→「类型：」**（`console:367`，改后 `:365`）；PRD 三条现状串系 `mark.reason` 数据 / LLM 文本，`src` 全域 0 命中 → `sensitiveMarkTypeLabel` 与 `mark.reason` 内容均不动 |
+| E-26 | `project-processing-console.tsx` — 原始转写稿说明「讯飞原始转写，供与整理稿对照；默认收起」 | **删除说明句**（§5 转写稿终裁：整句删除，同时消除「讯飞」品牌外露） | 与 UI-08 / UI-17 合并定稿：标题「原始转写稿」/ 说明句删除 / 按钮「展开全文」/ 空态「暂无转写稿」保持 → 本 IMPL-E 单 §1.5-⑯ |
+| E-27 | `project-processing-console.tsx` — 「按 Esc 也可以关闭」「默认收起」等界面行为说明 | 随帮助批次 | E-18 本批已删、E-26 本批已删（说明句整句删除）→ 本行**不另生动作**，仅登记 |
+| **UI-08 / UI-17**（新增行） | `project-processing-console.tsx` — 转写稿收纳卡 4 处（标题 / 说明句 / 展开按钮 / 空态） | 标题「原始转写稿」、说明句删除、按钮「展开全文」、空态「暂无转写稿」保持 | 与 E-26 合并定稿；2026-10-07 §5 转写稿四项终裁 |
 
 
 ### 2.6 F 批 · 全局英文 / 编号标签清理（7 条）
@@ -406,13 +407,13 @@ foreach ($s in @('Profile','Editable','Audio','Raw','Safety','Topics','Redaction
 - [ ] E-17 摘要卡为「包含转写稿、摘要与结构化档案」
 - [ ] E-18 结果查看页无「更适合通读长文本；按 Esc 也可以关闭。」
 - [ ] E-19 模块标题为「整理稿 / 时间线 / 档案 / 摘要 / 关键词 / 情绪提示 / 隐私处理 / 原始转写稿」，且**与实际模块一一对应**（无错配、无遗留「要素标引」「脱敏整理稿」）
-- [ ] E-20 结构化档案占位为「本小节暂无内容」
+- [ ] E-20 **生成侧移出本批**（`writing-rules.ts:186` 系 LLM prompt，Q-9，零改动）；**UI 侧** `project-processing-console.tsx:686` 空态为「本小节暂无内容」（2026-10-07 第四项终裁，本批已改）
 - [ ] E-21 情绪提示空态为「暂无情绪提示」
 - [ ] E-22 / E-23 统计为「共 N 处，待确认 N」、筛选为「全部 / 待确认 / 存疑」，两者口径一致
 - [ ] E-24 批量按钮为「全部确认」
 - [ ] E-25 原因字段为「类型：姓名 / 类型：手机号 / 类型：住址」
 - [ ] E-26 原始转写稿说明为「原始转写稿」（无「讯飞」「默认收起」）
-- [ ] **未列副本复核（预期原状）**：「脱敏」在 `project-processing-console.tsx`（模块名以外的若干处）、`interview-upload-form.tsx`（隐私模块 ＋ D-09/D-10 正文）、`project-overview-panel.tsx`、`app/layout.tsx`、`lib/**` 与「审校」在 `api/**`、`lib/**` 的残留 → 均**不属于本批已列条目**，保持原状
+- [ ] **未列副本复核（预期原状）**：「脱敏」在 `project-processing-console.tsx`（模块名以外的若干处）、`interview-upload-form.tsx`（隐私模块 ＋ D-09/D-10 正文）、`project-overview-panel.tsx`（`:49` / `:96` / `:100` 已按 Q-8 / Q-12 连带改净，见 E-19 行）、`app/layout.tsx`（SEO meta） 与「审校」在 `api/**`、`lib/**` 的残留 → 均**不属于本批已列条目**，保持原状
 - [ ] 与 UI-08 / UI-17（转写稿文案）的主从关系已在实施记录里写明
 
 ### 4.8 包 G · 全局回归（收尾包）

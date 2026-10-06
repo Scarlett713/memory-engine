@@ -60,7 +60,7 @@ export default async function ProjectDetailPage({
                     {project.projectName}
                   </h1>
                   <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-                    {project.notes || "当前项目未填写项目说明。"}
+                    {project.notes || "暂无项目说明"}
                   </p>
                 </div>
               </div>

@@ -143,8 +143,6 @@ function TextPanel({
   );
 }
 
-// 转写稿说明文案：默认收起时提示这是什么、去哪儿看整理稿。
-const TRANSCRIPT_HINT = "讯飞原始转写，供与整理稿对照；默认收起";
 const TRANSCRIPT_EMPTY_HINT = "暂无转写稿";
 // 展开态在卡内滚动，不把页面撑长（用户痛点是滚动层数太多，不是怕滚动）。
 const TRANSCRIPT_BODY_CLASS =
@@ -161,10 +159,10 @@ function TranscriptPanel({ content, dense = false }: { content: string; dense?: 
   const expanded = !empty && isExpanded;
 
   return (
-    <SurfaceSection title="原始转写稿（对照用）" icon={FileText} dense={dense}>
-      <p className="text-sm leading-6 text-muted">
-        {empty ? TRANSCRIPT_EMPTY_HINT : TRANSCRIPT_HINT}
-      </p>
+    <SurfaceSection title="原始转写稿" icon={FileText} dense={dense}>
+      {empty ? (
+        <p className="text-sm leading-6 text-muted">{TRANSCRIPT_EMPTY_HINT}</p>
+      ) : null}
       {/* 容器恒定渲染、正文按需挂载：aria-controls 始终指向存在的节点，
           折叠时也不把整篇转写稿留在 DOM 里（内联与弹层两份实例会翻倍）。 */}
       <div id={bodyId}>
@@ -178,7 +176,7 @@ function TranscriptPanel({ content, dense = false }: { content: string; dense?: 
           onClick={() => setIsExpanded((value) => !value)}
           className="mt-3 w-full rounded-[0.9rem] border border-line/50 bg-white/55 px-3 py-2 text-center text-xs font-semibold text-accent-strong transition-colors hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/40"
         >
-          {expanded ? "收起" : "展开对照"}
+          {expanded ? "收起" : "展开全文"}
         </button>
       )}
     </SurfaceSection>
@@ -207,7 +205,7 @@ function EmotionPanel({
   const emptyMessage =
     collectionPath === "ai_interview"
       ? "未识别到需要重点关注的情绪片段。"
-      : "该采集路径暂不提供情绪提示。";
+      : "暂无情绪提示";
 
   return (
     <SurfaceSection
@@ -254,7 +252,7 @@ function KeywordsPanel({
   dense?: boolean;
 }) {
   return (
-    <SurfaceSection title="主题关键词" icon={Tags} dense={dense}>
+    <SurfaceSection title="关键词" icon={Tags} dense={dense}>
       <div className="flex flex-wrap gap-2">
         {keywords.length > 0 ? (
           keywords.map((keyword) => (
@@ -266,7 +264,7 @@ function KeywordsPanel({
             </span>
           ))
         ) : (
-          <ElementEmptyState message="暂未提取到主题关键词。" />
+          <ElementEmptyState message="暂未提取到关键词。" />
         )}
       </div>
     </SurfaceSection>
@@ -364,11 +362,11 @@ function RedactionMarkCard({
         </span>
       </button>
 
-      <p className="mt-2 text-sm leading-6 text-muted">原因：{mark.reason}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">类型：{mark.reason}</p>
 
       {stillMaskedByRules ? (
         <p className="mt-2 rounded-[0.9rem] border border-warning/25 bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-          该片段同时命中自动规则，仍将脱敏
+          该片段同时命中自动规则，仍将进行隐私处理
         </p>
       ) : null}
 
@@ -385,7 +383,7 @@ function RedactionMarkCard({
                 className={`${SMALL_ACTION_CLASS} border-success/30 bg-success/10 text-success hover:bg-success/15`}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                确认脱敏
+                确认隐私处理
               </button>
               <button
                 type="button"
@@ -394,7 +392,7 @@ function RedactionMarkCard({
                 className={`${SMALL_ACTION_CLASS} border-line/60 bg-white/70 text-muted hover:bg-white`}
               >
                 <X className="h-3.5 w-3.5" />
-                撤销脱敏
+                撤销隐私处理
               </button>
             </>
           ) : (
@@ -418,8 +416,8 @@ type RedactionFilter = "all" | "pending" | "verify";
 
 const REDACTION_FILTERS: Array<{ value: RedactionFilter; label: string }> = [
   { value: "all", label: "全部" },
-  { value: "pending", label: "仅看待确认" },
-  { value: "verify", label: "仅看存疑" },
+  { value: "pending", label: "待确认" },
+  { value: "verify", label: "存疑" },
 ];
 
 function RedactionPanel({
@@ -524,17 +522,16 @@ function RedactionPanel({
   });
 
   return (
-    <SurfaceSection title="脱敏提示" icon={ShieldAlert} dense={dense}>
+    <SurfaceSection title="隐私处理" icon={ShieldAlert} dense={dense}>
       <div>
         {counts.total === 0 ? (
           <p className="text-sm leading-6 text-muted">
-            本稿无需人工复核的 AI 标记；规则脱敏已自动执行。
+            本稿无需人工复核的 AI 标记；规则隐私处理已自动执行。
           </p>
         ) : (
           <>
             <p className="text-sm leading-6 text-muted">
-              共 {counts.total} 处 · 待确认 {counts.pending} · 已确认 {counts.confirmed} ·
-              已撤销 {counts.revoked} · 待核实 {counts.verify}
+              共 {counts.total} 处，待确认 {counts.pending}
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -576,7 +573,7 @@ function RedactionPanel({
                   ) : (
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   )}
-                  批量确认 {counts.batch} 项（不含存疑）
+                  全部确认
                 </button>
                 {batchError ? (
                   <p className="mt-2 text-xs text-red-500">{batchError}</p>
@@ -676,14 +673,14 @@ function StructuredPanel({
   const meta = sections.length > 0 ? `共 ${sections.length} 节` : null;
 
   return (
-    <SurfaceSection title="结构化档案" icon={FileText} meta={meta} dense={dense}>
+    <SurfaceSection title="档案" icon={FileText} meta={meta} dense={dense}>
       <div className="grid gap-3">
         {sections.length > 0 ? (
           sections.map((section, index) => (
             <StructuredSectionCard key={section.id} section={section} index={index} />
           ))
         ) : (
-          <ElementEmptyState message="暂无结构化内容。" />
+          <ElementEmptyState message="本小节暂无内容" />
         )}
       </div>
     </SurfaceSection>
@@ -715,7 +712,7 @@ function ResultGrid({
       <div className={`grid min-w-0 gap-4 ${expanded ? "2xl:grid-cols-[1.1fr_0.9fr]" : "xl:grid-cols-[1.08fr_0.92fr]"}`}>
         <div className="flex min-w-0 flex-col gap-4">
           <TextPanel
-            title="脱敏整理稿"
+            title="整理稿"
             icon={Sparkles}
             content={project.redactedAiDraft || project.aiDraft}
             dense={expanded}
@@ -727,7 +724,7 @@ function ResultGrid({
 
         <div className="flex min-w-0 flex-col gap-4">
           <TextPanel
-            title="口述摘要"
+            title="摘要"
             icon={ScanText}
             content={project.summary}
             dense={expanded}
@@ -1058,8 +1055,7 @@ export function ProjectProcessingConsole({
       <section className="paper-panel h-full min-h-0 rounded-[1.85rem] p-4 md:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="section-eyebrow">上传即处理</p>
-            <h2 className="font-display mt-2 text-[1.7rem] font-semibold text-accent-strong md:text-[2rem]">
+            <h2 className="font-display mt-3 text-[1.7rem] font-semibold text-accent-strong md:text-[2rem]">
               整理结果
             </h2>
           </div>
@@ -1074,7 +1070,7 @@ export function ProjectProcessingConsole({
                 </>
               ) : (
                 <>
-                  {currentProject.transcriptRaw ? "重新生成整理结果" : "立即开始整理"}
+                  {currentProject.transcriptRaw ? "重新生成" : "开始整理"}
                   <Sparkles className="h-4 w-4" />
                 </>
               )}
@@ -1091,7 +1087,7 @@ export function ProjectProcessingConsole({
 
           {!hasResults ? (
             <div className="surface-card rounded-[1.5rem] p-5 text-sm leading-6 text-muted">
-              上传完成后，系统会自动生成音视频转写、情绪提示、脱敏稿和结构化档案内容；如果没有自动触发，也可以手动点击右上角立即开始整理。
+              处理中，完成后可查看结果
             </div>
           ) : null}
 
@@ -1103,15 +1099,15 @@ export function ProjectProcessingConsole({
                 <PenLine className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-foreground">
-                    AI 整理已完成 · 请确认审校结果
+                    整理完成，请确认
                   </p>
                   {/* xl 结果栅格就在下方，不需要弹层；<xl 才有「打开整理结果」这个动作 */}
                   <p className="mt-1 text-sm leading-6 text-muted">
                     <span className="hidden xl:inline">
-                      查看下方整理结果，确认无误后点击「完成审校」解锁导出。
+                      确认无误后即可导出
                     </span>
                     <span className="xl:hidden">
-                      点击下方打开整理结果进行复核，确认无误后点击「完成审校」解锁导出。
+                      确认无误后即可导出
                     </span>
                   </p>
                   {confirmError && (
@@ -1142,14 +1138,14 @@ export function ProjectProcessingConsole({
                       ) : pendingReviewCount > 0 ? (
                         <>
                           <span className="xl:hidden">
-                            请先在整理结果中处理（还剩 {pendingReviewCount} 处待确认）
+                            还有 {pendingReviewCount} 处待确认
                           </span>
                           <span className="hidden xl:inline">
-                            还剩 {pendingReviewCount} 处待确认
+                            {pendingReviewCount} 处待确认
                           </span>
                         </>
                       ) : (
-                        '完成审校，解锁导出'
+                        '完成审校'
                       )}
                     </button>
                   </div>
@@ -1202,10 +1198,10 @@ export function ProjectProcessingConsole({
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-accent-strong" />
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-foreground">
-                      整理结果已生成
+                      整理完成
                     </p>
                     <p className="mt-1 text-sm leading-6 text-muted">
-                      包含：音视频转写 · 脱敏稿 · 摘要 · 情绪提示 · 主题关键词 · 脱敏提示 · 要素标引 · 结构化档案
+                      包含原始转写稿、摘要与档案
                     </p>
                   </div>
                 </div>
@@ -1244,14 +1240,14 @@ export function ProjectProcessingConsole({
                 ) : pendingReviewCount > 0 ? (
                   <>
                     <span className="xl:hidden">
-                      请先在整理结果中处理（还剩 {pendingReviewCount} 处待确认）
+                      还有 {pendingReviewCount} 处待确认
                     </span>
                     <span className="hidden xl:inline">
-                      还剩 {pendingReviewCount} 处待确认
+                      {pendingReviewCount} 处待确认
                     </span>
                   </>
                 ) : (
-                  '完成审校，解锁导出'
+                  '完成审校'
                 )}
               </button>
             </div>
@@ -1268,9 +1264,6 @@ export function ProjectProcessingConsole({
                   <h3 className="font-display text-[1.8rem] font-semibold text-accent-strong">
                     整理结果
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-muted">
-                    更适合通读长文本；按 <span className="font-semibold text-accent-strong">Esc</span> 也可以关闭。
-                  </p>
                   {confirmError ? (
                     <p className="mt-2 text-xs text-red-500">{confirmError}</p>
                   ) : null}
@@ -1294,9 +1287,9 @@ export function ProjectProcessingConsole({
                       {isConfirming ? (
                         '处理中…'
                       ) : pendingReviewCount > 0 ? (
-                        `还剩 ${pendingReviewCount} 处待确认`
+                        `${pendingReviewCount} 处待确认`
                       ) : (
-                        '完成审校，解锁导出'
+                        '完成审校'
                       )}
                     </button>
                   ) : null}

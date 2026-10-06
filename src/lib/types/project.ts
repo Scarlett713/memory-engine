@@ -216,32 +216,32 @@ export function createInitialWorkflow(): WorkflowStep[] {
   return [
     {
       key: "upload",
-      label: "受访音频建档",
-      description: "受访音频已上传归档，系统准备进入自动整理流程。",
+      label: "音频已上传",
+      description: "",
       status: "completed",
     },
     {
       key: "transcription",
-      label: "音视频转写",
-      description: "调用语音识别服务，输出音视频转写稿。",
+      label: "转写",
+      description: "",
       status: "pending",
     },
     {
       key: "ai_refine",
-      label: "整理与脱敏",
-      description: "完成摘要、结构化整理、情绪提示与隐私脱敏。",
+      label: "整理与隐私处理",
+      description: "",
       status: "pending",
     },
     {
       key: "manual_review",
       label: "人工审校",
-      description: "研究员进行复核，并决定是否进入成果导出。",
+      description: "",
       status: "pending",
     },
     {
       key: "export",
       label: "成果导出",
-      description: "生成可归档的 docx、txt 和结构化 JSON 成果。",
+      description: "",
       status: "pending",
     },
   ];

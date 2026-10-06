@@ -44,7 +44,7 @@ export function ProjectWorkflowBoard({
       <div className="flex items-center justify-between gap-3">
         <p className="section-eyebrow">处理进度</p>
         <p className="text-xs leading-5 text-muted">
-          上传后自动完成音视频转写、整理与脱敏，人工审校后即可导出。
+          处理完成后可导出
         </p>
       </div>
 
@@ -90,9 +90,11 @@ export function ProjectWorkflowBoard({
               <h3 className="mt-1.5 text-sm font-semibold text-foreground">
                 {step.label}
               </h3>
-              <p className="mt-2 text-xs leading-6 text-muted">
-                {step.description}
-              </p>
+              {step.description ? (
+                <p className="mt-2 text-xs leading-6 text-muted">
+                  {step.description}
+                </p>
+              ) : null}
             </article>
           );
         })}
