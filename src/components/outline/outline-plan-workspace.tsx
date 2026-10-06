@@ -496,7 +496,7 @@ export function OutlinePlanWorkspace({
 
           <div>
             <label className="field-label" htmlFor={`${idPrefix}-subject`}>
-              访谈对象姓名
+              受访对象
               <span className="ml-1 text-red-500">*</span>
             </label>
             <input
@@ -510,7 +510,7 @@ export function OutlinePlanWorkspace({
 
           <div className="flex min-h-0 flex-col md:col-span-2">
             <label className="field-label" htmlFor={`${idPrefix}-overview`}>
-              访谈内容概述
+              详细介绍
             </label>
             <textarea
               id={`${idPrefix}-overview`}
