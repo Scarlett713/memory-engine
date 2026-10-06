@@ -991,7 +991,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   退出访谈
                 </Button>
               </div>
-              <p className="section-eyebrow mt-3">Step 02 · AI 访谈</p>
+              <p className="section-eyebrow mt-3">AI 访谈</p>
               <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
                 {project.projectName}
               </h1>
@@ -1246,7 +1246,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
         <div className="fixed inset-0 z-[70] bg-[rgba(35,26,20,0.42)] backdrop-blur-[6px]">
           <div className="flex h-full flex-col items-center justify-center p-2 sm:p-3">
             <div className="paper-panel paper-panel-strong w-full max-w-xl rounded-[2rem] px-4 py-5 md:px-6 md:py-6">
-              <p className="section-eyebrow">Step 02 · AI 访谈</p>
+              <p className="section-eyebrow">AI 访谈</p>
               <h2 className="font-display mt-2 text-[1.5rem] font-semibold leading-tight text-accent-strong">
                 {state.pauseReason === "emotion"
                   ? "检测到您可能有些情绪波动，已自动暂停访谈。需要休息一下吗？"
@@ -1323,7 +1323,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
               onClick={(event) => event.stopPropagation()}
               className="paper-panel paper-panel-strong w-full max-w-xl rounded-[2rem] px-4 py-5 md:px-6 md:py-6"
             >
-              <p className="section-eyebrow">Step 02 · AI 访谈</p>
+              <p className="section-eyebrow">AI 访谈</p>
               <h2
                 id="interview-exit-title"
                 className="font-display mt-2 text-[1.5rem] font-semibold leading-tight text-accent-strong"

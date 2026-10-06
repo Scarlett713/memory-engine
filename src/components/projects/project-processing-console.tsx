@@ -70,7 +70,6 @@ type TextPanelProps = {
   title: string;
   icon: typeof FileText;
   content: string;
-  tag: string;
   dense?: boolean;
   // 只有「脱敏整理稿」开这个开关：它可能长到把首屏占满。口述摘要复用同一个组件但不开，
   // 保持不限高。默认 false 即老行为。
@@ -89,7 +88,6 @@ function TextPanel({
   title,
   icon: Icon,
   content,
-  tag,
   dense = false,
   clampBody = false,
 }: TextPanelProps) {
@@ -120,7 +118,7 @@ function TextPanel({
 
   return (
     <div ref={containerRef} className="min-w-0">
-      <SurfaceSection title={title} icon={Icon} tag={tag} dense={dense}>
+      <SurfaceSection title={title} icon={Icon} dense={dense}>
         <div
           id={contentId}
           className={`whitespace-pre-wrap wrap-break-word text-sm leading-7 text-muted ${
@@ -163,7 +161,7 @@ function TranscriptPanel({ content, dense = false }: { content: string; dense?: 
   const expanded = !empty && isExpanded;
 
   return (
-    <SurfaceSection title="原始转写稿（对照用）" icon={FileText} tag="Raw" dense={dense}>
+    <SurfaceSection title="原始转写稿（对照用）" icon={FileText} dense={dense}>
       <p className="text-sm leading-6 text-muted">
         {empty ? TRANSCRIPT_EMPTY_HINT : TRANSCRIPT_HINT}
       </p>
@@ -215,7 +213,6 @@ function EmotionPanel({
     <SurfaceSection
       title="情绪提示"
       icon={AlertTriangle}
-      tag="Safety"
       dense={dense}
     >
       <div className="grid gap-3">
@@ -257,7 +254,7 @@ function KeywordsPanel({
   dense?: boolean;
 }) {
   return (
-    <SurfaceSection title="主题关键词" icon={Tags} tag="Topics" dense={dense}>
+    <SurfaceSection title="主题关键词" icon={Tags} dense={dense}>
       <div className="flex flex-wrap gap-2">
         {keywords.length > 0 ? (
           keywords.map((keyword) => (
@@ -527,7 +524,7 @@ function RedactionPanel({
   });
 
   return (
-    <SurfaceSection title="脱敏提示" icon={ShieldAlert} tag="Redaction" dense={dense}>
+    <SurfaceSection title="脱敏提示" icon={ShieldAlert} dense={dense}>
       <div>
         {counts.total === 0 ? (
           <p className="text-sm leading-6 text-muted">
@@ -679,7 +676,7 @@ function StructuredPanel({
   const meta = sections.length > 0 ? `共 ${sections.length} 节` : null;
 
   return (
-    <SurfaceSection title="结构化档案" icon={FileText} tag="Archive" meta={meta} dense={dense}>
+    <SurfaceSection title="结构化档案" icon={FileText} meta={meta} dense={dense}>
       <div className="grid gap-3">
         {sections.length > 0 ? (
           sections.map((section, index) => (
@@ -721,7 +718,6 @@ function ResultGrid({
             title="脱敏整理稿"
             icon={Sparkles}
             content={project.redactedAiDraft || project.aiDraft}
-            tag="Redacted"
             dense={expanded}
             clampBody
           />
@@ -734,7 +730,6 @@ function ResultGrid({
             title="口述摘要"
             icon={ScanText}
             content={project.summary}
-            tag="Summary"
             dense={expanded}
           />
           <KeywordsPanel keywords={project.keywords} dense={expanded} />

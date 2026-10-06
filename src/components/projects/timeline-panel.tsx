@@ -49,7 +49,7 @@ export function TimelinePanel({
       : null;
 
   return (
-    <SurfaceSection title="要素标引" icon={Sparkles} tag="Timeline" meta={meta} dense={dense}>
+    <SurfaceSection title="要素标引" icon={Sparkles} meta={meta} dense={dense}>
       <div className="grid gap-3">
         {events.length > 0 ? (
           <ol id={listId} className="grid gap-3">

@@ -880,7 +880,6 @@ export function InterviewUploadForm() {
                       上传音频材料
                     </h3>
                   </div>
-                  <div className="tape-label">Audio</div>
                 </div>
 
                 <div className="relative mt-3 flex flex-1">

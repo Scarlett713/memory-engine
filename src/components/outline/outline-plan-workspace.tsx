@@ -480,7 +480,6 @@ export function OutlinePlanWorkspace({
               必填信息
             </h2>
           </div>
-          <div className="tape-label">Profile</div>
         </div>
 
         {/* UI-12：单卡三控件，顺序固定为 主题 → 姓名 → 内容概述（对齐 REQ-21）。 */}
@@ -612,7 +611,6 @@ export function OutlinePlanWorkspace({
         <div>
           <h2 className="text-base font-semibold text-foreground">访谈提纲</h2>
         </div>
-        <div className="tape-label">Editable</div>
       </div>
 
       {notice ? (

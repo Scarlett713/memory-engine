@@ -16,7 +16,9 @@ export function SurfaceSection({
 }: {
   title: string;
   icon: LucideIcon;
-  tag: string;
+  // 右上角胶囊标签（REQ-28-F 起英文标签已全删，当前仅剩空位）。
+  // 可选：没有标签的面板不再渲染空胶囊——空 span 仍带边框与内边距，会留下一个小空框。
+  tag?: string;
   // 面板头计数/提示（「共 9 项 · 2 项时间待补充」「共 3 节」）。
   // 可选：不是每个面板都有可计数的条目，空态旁边挂个「共 0 项」是噪音。
   meta?: ReactNode;
@@ -37,7 +39,7 @@ export function SurfaceSection({
           </h3>
           {meta ? <span className="text-xs font-medium text-muted">{meta}</span> : null}
         </div>
-        <span className="tape-label shrink-0">{tag}</span>
+        {tag ? <span className="tape-label shrink-0">{tag}</span> : null}
       </div>
       <div className="mt-4">{children}</div>
     </article>
