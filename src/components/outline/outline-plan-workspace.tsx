@@ -610,10 +610,7 @@ export function OutlinePlanWorkspace({
     <>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="section-eyebrow">提纲编辑</p>
-          <h2 className="mt-1.5 text-base font-semibold text-foreground">
-            Markdown 草稿
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">访谈提纲</h2>
         </div>
         <div className="tape-label">Editable</div>
       </div>
@@ -739,11 +736,7 @@ export function OutlinePlanWorkspace({
             ))}
             <div ref={chatBottomRef} />
           </div>
-        ) : (
-          <p className="text-sm leading-6 text-muted">
-            生成提纲后，可以用一句话让 AI 继续调整，例如调整提问顺序或语气。
-          </p>
-        )}
+        ) : null}
       </>
     );
   }
