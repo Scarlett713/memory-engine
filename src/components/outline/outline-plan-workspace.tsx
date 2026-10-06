@@ -952,7 +952,15 @@ export function OutlinePlanWorkspace({
                   <div className="hidden shrink-0 xl:block">{actionRow}</div>
                 </section>
 
-                <section className="archive-frame paper-panel paper-panel-strong flex flex-col gap-3 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0">
+                {/* 空态 + <xl 时整块不渲染：移动端输入条固定在视口底部（见文件末），
+                    这一格在窄屏只剩一张约 42px 高的白卡片，夹在提纲卡片与动作行之间。
+                    xl 必须保留 —— PC 的输入区就住在这块里面（下面那个 hidden xl:flex）。
+                    用 flex / hidden xl:flex 二选一，不让 flex 与 hidden 同时出现在类串里。 */}
+                <section
+                  className={`archive-frame paper-panel paper-panel-strong flex-col gap-3 rounded-[1.85rem] p-4 md:p-5 xl:min-h-0 ${
+                    messages.length ? "flex" : "hidden xl:flex"
+                  }`}
+                >
                   {/* 移动端底下是动作行 + pb-64 留白，不再需要给固定输入条预留的 pb-36。 */}
                   {renderChatBody(
                     "soft-scroll flex min-h-0 flex-col gap-3 overflow-y-auto pr-1 xl:flex-1",
