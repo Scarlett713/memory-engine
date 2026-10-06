@@ -146,7 +146,7 @@
 | 编号 | 落点（文件 ＋ 检索字面） | 改动类型 | 备注（实测 / 复用 / 牵连） |
 | --- | --- | --- | --- |
 | D-01 | `src/components/upload/upload-workspace.tsx` — 眉标「记忆引擎」 | 删除 | ⚠ 同词在 **8 个文件**出现（§0.1 第二表）→ 本批**只删上传页这一处**，其余 7 处按 0.2-D4 不动 |
-| D-02 | `upload-workspace.tsx` — 主标题「音频建档与处理」 | 替换 →「上传音频」（或「音频处理」） | |
+| D-02 | `upload-workspace.tsx` — 主标题「音频建档与处理」 | 替换 →「音频处理」 | 裁决 ❷：PRD 原备选「上传音频」未取（与同屏 D-05 同词撞 R5）→ D 单 §0.3 |
 | D-03 | `upload-workspace.tsx` — 主标题下说明「填写受访人基础信息，上传本地音视频文件…」 | 替换 →「上传录音后自动转写整理」 | |
 | D-04 | `src/components/upload/interview-upload-form.tsx` — 语言选择默认值「普通话（默认）」 | 替换 →「普通话」 | 改的是选项**文案字面**，不动 `value` |
 | D-05 | `interview-upload-form.tsx` — 上传卡片眉标「受访音频」＋ 标题「上传音频材料」 | 替换 →「上传音频」 | 与 F-05 的 `Audio` 标签**同屏**：本批删标签、改中文标题 → 两批须一起验收（§4 D 包） |
@@ -377,7 +377,7 @@ foreach ($s in @('Profile','Editable','Audio','Raw','Safety','Topics','Redaction
 ### 4.5 包 D · 上传音频 ＋ 知情同意（含红线）
 
 - [ ] D-01 上传页无「记忆引擎」眉标（其余 7 处未列副本保持原状 → 预期）
-- [ ] D-02 / D-03 主标题为「上传音频」，说明为「上传录音后自动转写整理」
+- [ ] D-02 h1 →「音频处理」；D-03 副标题 →「上传录音后自动转写整理」（PRD 目标字面）
 - [ ] D-04 语言选择显示「普通话」（无「（默认）」）
 - [ ] D-05 卡片为「上传音频」，且右上角无 `Audio` 标签（与 F-05 同屏一起验收）
 - [ ] D-06 上传区无格式清单句；同屏 `<details>` 隐私保护模块不受影响
@@ -430,14 +430,19 @@ foreach ($s in @('Profile','Editable','Audio','Raw','Safety','Topics','Redaction
 
 ## §5 实施注意事项
 
-### 5.1 编码与换行（实测基线）
+### 5.1 编码与换行（**2026-10-07 实测纠正**）
 
-| 项 | 仓库基线 | 本批要求 |
+> **纠偏说明**：本节原记「源文件与 `docs/tasks/*.md` 均为 CRLF」与「仅 `src/lib/types/project.ts` 带 BOM」**两项与实测不符**（2026-10-07 复核，HEAD `15d6db2`），现按实测回写（授权：总管 D 批裁决 ❻；依据：`docs/tasks/IMPL_REQ-28-D_上传音频文案与UI-05.md` §0.1）。
+
+| 项 | 仓库基线（**实测**） | 本批要求 |
 | --- | --- | --- |
 | 编码 | 源文件 UTF-8 | 一律 UTF-8 |
-| BOM | **`src/lib/types/project.ts` 带 BOM**；其余源文件无 BOM | 保留该文件的 BOM，**其余不得新增 BOM** |
-| 换行 | 源文件与 `docs/tasks/*.md` 均为 **CRLF** | 只改字面量时天然保持；若某次编辑整文件重写，须把 `\n` 归一为 `\r\n` 再落盘，否则整份 diff |
+| BOM | 带 BOM 的源文件 **9 个**：`app/layout.tsx`、`app/not-found.tsx`、`components/projects/project-workflow-board.tsx`、`components/ui/button.tsx`、`components/ui/status-badge.tsx`、`lib/server/storage.ts`、`lib/server/upload-store.ts`、`lib/types/project.ts`、`lib/utils.ts` | 逐文件**原样保留**，**不新增也不删除 BOM**（本批落点两文件均无 BOM） |
+| 换行 | `src/**` 实测：**纯 LF 73 个**、**纯 CRLF 1 个**（`src/lib/server/enum.ts`）、**混合 3 个**（`src/app/not-found.tsx`、`src/components/ui/button.tsx`、`src/lib/server/upload-store.ts`）；`core.autocrlf=false`、无 `.gitattributes`、`git ls-files --eol` = `i/lf w/lf`。`docs/tasks/*.md` 为 **CRLF** ✓ | **按文件现状保持原行尾**（只改字面量时天然保持）；**若某次编辑整文件重写，须先确认该文件原行尾再落盘**，否则产生整份 diff |
 | 引号 / 缩进 | JSX 文案多为双引号 | 只替换字面量内容，不改引号风格与缩进 |
+| 行号定位 | PS 5.1 `Get-Content` 会把**无 BOM 的 UTF-8 当 GBK 解码**，吞掉中文标点后的换行（实测 `interview-upload-form.tsx` 被算成 927 行，真值 998，偏差 71 行） | 行号一律用 `[IO.File]::ReadAllLines` 或 `Select-String`；**禁用 `Get-Content` 定位行号** |
+
+**实施轮禁止操作（三项）**：① **禁止**对 LF 文件做整文件 CRLF 归一（会污染如 `interview-upload-form.tsx` 的整份 diff）；② **禁止**用 `Get-Content` 定位行号；③ BOM 文件原样保留，不增删 BOM。
 
 ### 5.2 改动纪律（只改字符串字面量）
 

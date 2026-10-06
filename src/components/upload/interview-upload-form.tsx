@@ -55,7 +55,7 @@ const defaultRules: RedactionRule[] = [
 
 // 讯飞转写 language 参数取值（方言识别）
 const languageOptions = [
-  { value: "cn", label: "普通话（默认）" },
+  { value: "cn", label: "普通话" },
   { value: "en", label: "英语" },
   { value: "cn_cantonese", label: "粤语" },
   { value: "cn_sichuan", label: "四川话" },
@@ -181,7 +181,7 @@ function ConsentDialog({
 
           {!checked ? (
             <p className="mt-2.5 text-xs leading-5 text-muted">
-              请先勾选知情同意确认，才能创建项目并开始处理。
+              请先勾选知情同意
             </p>
           ) : null}
 
@@ -320,7 +320,7 @@ export function InterviewUploadForm() {
 
   const helperText = useMemo(() => {
     if (!audioFile) {
-      return "支持 mp3、wav、m4a、aac、flac、ogg 等常见音频格式。";
+      return "";
     }
 
     const sizeInMb = (audioFile.size / 1024 / 1024).toFixed(2);
@@ -875,9 +875,8 @@ export function InterviewUploadForm() {
               <div className="surface-card flex flex-col rounded-[1.55rem] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="section-eyebrow">受访音频</p>
                     <h3 className="mt-1.5 text-base font-semibold text-foreground">
-                      上传音频材料
+                      上传音频
                     </h3>
                   </div>
                 </div>
@@ -900,9 +899,11 @@ export function InterviewUploadForm() {
                         <p className="text-sm font-semibold text-foreground md:text-base">
                           {audioFile ? "更换受访音频" : "选择音频文件"}
                         </p>
-                        <p className="mt-1.5 text-sm leading-6 text-muted">
-                          {helperText}
-                        </p>
+                        {helperText ? (
+                          <p className="mt-1.5 text-sm leading-6 text-muted">
+                            {helperText}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </button>
@@ -931,7 +932,7 @@ export function InterviewUploadForm() {
               ? "带 * 的项为必填，完成后进入采集路径选择。"
               : step === 2
                 ? "本轮仅开放本地上传，AI 访谈即将开放。"
-                : "提交后将直接开始本地音频转写、AI 整理与隐私脱敏处理。"}
+                : "提交后开始处理"}
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -976,7 +977,7 @@ export function InterviewUploadForm() {
                   </>
                 ) : (
                   <>
-                    创建项目并开始处理
+                    开始处理
                     <FileText className="h-4 w-4" />
                   </>
                 )}

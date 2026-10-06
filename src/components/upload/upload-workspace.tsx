@@ -26,12 +26,11 @@ export function UploadWorkspace() {
                 <ArrowLeft className="h-4 w-4" />
                 返回工作台
               </Link>
-              <p className="section-eyebrow mt-3">记忆引擎</p>
-              <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
-                音频建档与处理
+              <h1 className="font-display mt-3 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem] md:text-[2.35rem]">
+                音频处理
               </h1>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-                填写受访人基础信息，上传本地音视频文件，进入自动转写与整理流程。
+                上传录音后自动转写整理
               </p>
             </div>
           </div>
