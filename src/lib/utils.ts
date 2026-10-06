@@ -9,6 +9,7 @@ export function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "short",
+    // 显式钉定北京时间：线上容器 TZ=UTC，不加此项服务端渲染会少 8h（BUG-08）
     timeZone: "Asia/Shanghai",
   }).format(new Date(value));
 }
