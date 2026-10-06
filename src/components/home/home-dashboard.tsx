@@ -84,9 +84,6 @@ export function HomeDashboard() {
             <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
               开始一个新项目
             </h2>
-            <p className="text-sm leading-6 text-muted">
-              填写受访者与访谈主题，生成个性化提纲后进入建档流程。
-            </p>
             {/* 首页唯一的新建入口。REQ-16 之前 header 里有两个 CTA（/projects/new/outline
                 与 /upload），现收敛为这一个；/upload 降级为非首页入口，仅由提纲链路跳入。 */}
             <Link
@@ -102,20 +99,17 @@ export function HomeDashboard() {
             data-home-zone="draft"
             className="paper-panel archive-frame flex flex-col gap-3 rounded-[2rem] p-5 xl:min-h-0"
           >
-            <p className="section-eyebrow">草稿</p>
+            <p className="section-eyebrow">进行中</p>
             <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
-              未完成的草稿
+              未完成的访谈
             </h2>
             {/* REQ-15 未到位，本区只落空态：不读写存储、不自建第二套 sessionStorage。 */}
             <div className="surface-card rounded-[1.5rem] p-5">
-              <p className="text-sm font-semibold text-accent-strong">暂无草稿</p>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                新建项目后未提交的内容会出现在这里，可随时继续填写。
-              </p>
+              <p className="text-sm font-semibold text-accent-strong">暂无进行中的项目</p>
             </div>
           </div>
 
-          {/* 历史项目区：外壳只出面板与内边距，区头（eyebrow + 「历史项目」+ 计数 pill）
+          {/* 我的项目区：外壳只出面板与内边距，区头（eyebrow + 「我的项目」+ 计数 pill）
               由 RecentProjectList 自己渲染，避免两处标题重复。 */}
           <div
             data-home-zone="projects"

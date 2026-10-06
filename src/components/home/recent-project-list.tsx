@@ -11,7 +11,6 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { getWorkflowStatusLabel } from "@/components/projects/project-workflow-board";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   HOME_SCROLL_STORAGE_KEY,
@@ -74,15 +73,14 @@ export function RecentProjectList({
     <section className="flex min-w-0 flex-col xl:min-h-0 xl:flex-1">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="section-eyebrow">项目索引</p>
-          <h2 className="font-display mt-2 text-[1.35rem] font-semibold text-accent-strong">
-            历史项目
+          <h2 className="font-display text-[1.35rem] font-semibold text-accent-strong">
+            我的项目
           </h2>
         </div>
 
         <div className="meta-pill text-sm font-medium text-muted">
           <FolderArchive className="h-4 w-4 text-accent-strong" />
-          {projects.length} 个项目
+          {projects.length} 个
         </div>
       </div>
 
@@ -124,11 +122,6 @@ export function RecentProjectList({
             )}%`;
             const isDeleting =
               isPending && pendingProjectId === project.id;
-            // 当前阶段：优先「进行中」的那一步，没有就退回第一个「待处理」。
-            // 全部完成时不显示——此时 StatusBadge 已经在说结果了。
-            const activeStep =
-              project.workflow.find((step) => step.status === "in_progress") ??
-              project.workflow.find((step) => step.status === "pending");
 
             return (
               <article
@@ -142,18 +135,12 @@ export function RecentProjectList({
                         {project.projectName}
                       </h3>
                       <StatusBadge status={project.status} />
-                      {activeStep ? (
-                        <span className="meta-pill text-xs font-medium text-muted">
-                          当前阶段：{activeStep.label} ·{" "}
-                          {getWorkflowStatusLabel(activeStep)}
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-2 truncate text-sm text-muted">
                       受访对象：{project.intervieweeName || "未填写"}
                     </p>
                     <p className="mt-1 truncate text-sm text-muted">
-                      受访音频：{project.audioFileName}
+                      {project.audioFileName ? "音频：已上传" : "音频：待上传"}
                     </p>
                   </div>
 
@@ -185,7 +172,7 @@ export function RecentProjectList({
                   <div className="rounded-[1rem] border border-line/70 bg-white/58 px-3 py-3">
                     <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Clock3 className="h-4 w-4 text-accent-strong" />
-                      建档时间
+                      创建时间
                     </span>
                     <p className="mt-1.5 text-sm text-muted">
                       {formatDateTime(project.createdAt)}
@@ -198,7 +185,7 @@ export function RecentProjectList({
                       进度
                     </span>
                     <p className="mt-1.5 text-sm text-muted">
-                      {completedSteps} / {project.workflow.length} 已完成
+                      已完成 {completedSteps}/{project.workflow.length}
                     </p>
                   </div>
                 </div>

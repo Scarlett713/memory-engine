@@ -12,7 +12,7 @@ const statusMap: Record<
   }
 > = {
   uploaded: {
-    label: "待处理",
+    label: "整理中",
     className: "border border-accent-soft bg-accent-soft/70 text-accent-strong",
   },
   transcribing: {
@@ -24,7 +24,7 @@ const statusMap: Record<
     className: "border border-warning/20 bg-warning/10 text-warning",
   },
   manual_review: {
-    label: "待人工审校",
+    label: "待审核",
     className: "border border-deep/15 bg-deep/10 text-deep",
   },
   ready_to_export: {
