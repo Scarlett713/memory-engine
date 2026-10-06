@@ -107,7 +107,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
             onChange={(event) =>
               onChange({ ...value, overview: event.target.value })
             }
-            placeholder="您可补充说明需要记录的相关事件、人物信息、时间线索等内容，以便我们向您提供个性化访谈提纲"
+            placeholder="补充事件、人物、时间线等背景信息"
           />
         </div>
       </div>
@@ -125,7 +125,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
           data-step-next="outline"
           className="w-full justify-center sm:w-auto"
         >
-          下一步：生成提纲
+          下一步
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>

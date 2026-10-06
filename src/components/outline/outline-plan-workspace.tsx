@@ -472,13 +472,7 @@ export function OutlinePlanWorkspace({
       <div className="surface-card flex min-h-0 flex-1 flex-col rounded-[1.55rem] p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="section-eyebrow">
-              受访者画像
-              <span className="ml-1 text-red-500">*</span>
-            </p>
-            <h2 className="mt-1.5 text-base font-semibold text-foreground">
-              必填信息
-            </h2>
+            <p className="section-eyebrow">访谈信息</p>
           </div>
         </div>
 
@@ -533,10 +527,7 @@ export function OutlinePlanWorkspace({
   }
 
   const generateRow = (
-    <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs leading-5 text-muted">
-        生成后可自由修改，提纲不会自动上传。
-      </p>
+    <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-end">
       <Button
         type="button"
         onClick={handleGenerate}
@@ -564,7 +555,7 @@ export function OutlinePlanWorkspace({
         onClick={handleSkip}
         className="w-full sm:w-auto"
       >
-        {embedded ? "跳过提纲，下一步" : "跳过，直接上传"}
+        {embedded ? "跳过" : "跳过，直接上传"}
       </Button>
       {/* 「进入 AI 访谈」只在独立页出现。嵌进 REQ-21 流程后，AI 那条路
           归分流步（route-chooser）决定，此处再放一个就成了同屏双入口。 */}
@@ -595,7 +586,7 @@ export function OutlinePlanWorkspace({
         disabled={!markdown.trim()}
         className="w-full sm:w-auto"
       >
-        {embedded ? "确认提纲，下一步" : "确认提纲，进入上传"}
+        {embedded ? "确认并继续" : "确认提纲，进入上传"}
         <ArrowRight className="h-4 w-4" />
       </Button>
     </div>
@@ -767,7 +758,7 @@ export function OutlinePlanWorkspace({
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              发送修改
+              提交修改
             </>
           )}
         </Button>
@@ -816,7 +807,7 @@ export function OutlinePlanWorkspace({
                   <ArrowLeft className="h-4 w-4" />
                   返回工作台
                 </Link>
-                <p className="section-eyebrow mt-3">Step 01 · 访谈准备</p>
+                <p className="section-eyebrow mt-3">访谈准备</p>
                 <h1 className="font-display mt-2 text-[1.6rem] font-semibold leading-tight text-accent-strong sm:text-[1.9rem]">
                   生成个性化访谈提纲
                 </h1>

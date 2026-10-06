@@ -197,7 +197,7 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
           这次访谈怎么开始
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          两种方式都会带上你刚填的基本信息，不需要再填一遍。
+          已自动带入基本信息
         </p>
       </div>
 
@@ -222,7 +222,7 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
             ) : null}
           </div>
           <span className="mt-2 block text-xs leading-6">
-            用提纲驱动 AI 逐题追问，边聊边录，结束后直接进访谈控制台。
+            按提纲逐题访谈并自动记录
           </span>
         </button>
 
@@ -238,7 +238,7 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
             上传音频
           </span>
           <span className="mt-2 block text-xs leading-6">
-            已经有录音了？上传音频文件，自动转写、整理与脱敏。
+            上传录音，自动转写整理
           </span>
         </button>
       </div>
@@ -261,7 +261,7 @@ export function RouteChooser({ basicInfo, onBackToOutline }: RouteChooserProps) 
           onBackToOutline 保留，由下面的 OutlineRequiredDialog 消费。 */}
       <div className="flex flex-col gap-3 border-t border-line/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-muted">
-          提纲留空也可以直接上传音频。
+          无需提纲也可上传
         </p>
       </div>
 
