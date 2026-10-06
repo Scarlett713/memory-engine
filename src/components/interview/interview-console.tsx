@@ -996,8 +996,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 {project.projectName}
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-                受访者 {project.intervieweeName || "未填写"} · AI 逐题提问，
-                结束后自动上传录音并启动讯飞归档。
+                受访者：{project.intervieweeName || "未填写"}
               </p>
             </div>
           </div>
@@ -1020,7 +1019,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   {project.projectName}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  提纲共 {totalQuestions} 条，开始后 AI 会逐题提问。
+                  共 {totalQuestions} 条提纲
                 </p>
               </div>
 
@@ -1121,7 +1120,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   }}
                 >
                   <Mic className="h-4 w-4" />
-                  我已听清，开始回答
+                  开始回答
                 </Button>
                 <Button
                   type="button"
@@ -1157,7 +1156,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
               <div className="surface-card soft-scroll min-h-[14rem] whitespace-pre-wrap rounded-[1.55rem] px-4 py-4 text-sm leading-7 text-foreground">
                 {captionText || (
                   <span className="text-muted">
-                    点击开始录音后，这里会实时显示对话文字。
+                    开始录音后显示文字
                   </span>
                 )}
               </div>
@@ -1208,7 +1207,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
               <div className="surface-card soft-scroll min-h-[10rem] rounded-[1.55rem] px-4 py-4 text-sm leading-7 text-muted">
                 {state.captions ||
-                  "点击开始录音后，这里会实时显示对话文字。"}
+                  "开始录音后显示文字"}
               </div>
             </>
           ) : null}
@@ -1253,9 +1252,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                   : "访谈已暂停。"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted">
-                已录音与已转写内容已保留。按{" "}
-                <span className="font-semibold text-accent-strong">Esc</span>{" "}
-                也可以继续访谈。
+                已保存当前进度
               </p>
               {/* 只陈述事实，不给建议话术（session 约束）。 */}
               {state.pauseReason === "emotion" ? (
