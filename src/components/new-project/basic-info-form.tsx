@@ -5,9 +5,12 @@ import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
+// 与服务端 NOTES_MAX_LENGTH 对齐（/api/outline/generate、/api/projects）。
+const OVERVIEW_MAX_LENGTH = 1000;
+
 /**
  * 三步流程「基本信息」的载荷（REQ-21 §4.2）。
- * 只有 projectName / intervieweeName 是必填；overview 选填。
+ * 三项均必填（overview 自任老师反馈批次 1 起改为必填的「详细介绍」）。
  * 本类型定义在表单侧，流程容器与分流步都从这里取，避免三处各写一份。
  */
 export type BasicInfo = {
@@ -29,8 +32,12 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
     // 前端校验即可，不发网络请求（PRD §9-2：必填未过时不能进入任一分支）。
     event.preventDefault();
 
-    if (!value.projectName.trim() || !value.intervieweeName.trim()) {
-      setError("请先填写访谈主题与受访对象。");
+    if (
+      !value.projectName.trim() ||
+      !value.intervieweeName.trim() ||
+      !value.overview.trim()
+    ) {
+      setError("请先填写访谈主题、受访对象与详细介绍。");
       return;
     }
 
@@ -70,7 +77,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
           />
         </div>
 
-        <div>
+        <div className="xl:col-span-2">
           <label className="field-label" htmlFor="intervieweeName">
             受访对象
             <span className="ml-1 text-red-500">*</span>
@@ -87,25 +94,20 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
           />
         </div>
 
-        {/* 选填，与必填项并排占满另一格；窄屏自然堆叠。 */}
-        <div className="flex items-end">
-          <p className="text-xs leading-5 text-muted">
-            描述信息选填，可以在下一步生成提纲时再补充细节。
-          </p>
-        </div>
-
         <div className="xl:col-span-2">
           <label className="field-label" htmlFor="overview">
-            描述信息
+            详细介绍
+            <span className="ml-1 text-red-500">*</span>
           </label>
           <textarea
             id="overview"
             className="text-area min-h-[7rem]"
             value={value.overview}
+            maxLength={OVERVIEW_MAX_LENGTH}
             onChange={(event) =>
               onChange({ ...value, overview: event.target.value })
             }
-            placeholder="补充这次访谈的背景、想覆盖的时段或事件，AI 会据此生成提纲。"
+            placeholder="您可补充说明需要记录的相关事件、人物信息、时间线索等内容，以便我们向您提供个性化访谈提纲"
           />
         </div>
       </div>

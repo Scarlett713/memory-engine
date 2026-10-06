@@ -97,6 +97,12 @@ type OutlinePlanWorkspaceProps = {
    * 与 initialTopic 同源，取自基本信息步的受访者姓名。
    */
   initialSubject?: string;
+  /**
+   * 「详细介绍」输入框的初值。默认 "" —— 不传时与本次改动前的行为逐字一致。
+   * 三步流程传基本信息步的「详细介绍」；生成 / 改写提纲时该值随
+   * researchFocus + ethicsNotes 双写进 prompt（任老师反馈批次 1 ⑧）。
+   */
+  initialOverview?: string;
 };
 
 export function OutlinePlanWorkspace({
@@ -104,6 +110,7 @@ export function OutlinePlanWorkspace({
   onContinue,
   initialTopic,
   initialSubject,
+  initialOverview,
 }: OutlinePlanWorkspaceProps = {}) {
   const router = useRouter();
 
@@ -111,7 +118,7 @@ export function OutlinePlanWorkspace({
   const [topic, setTopic] = useState(initialTopic ?? "");
   // UI-12：六个被合并字段共用这一个自由文本框，提交时双写进
   // researchFocus 与 ethicsNotes / notes（见 PRD §4 决策记录）。
-  const [overview, setOverview] = useState("");
+  const [overview, setOverview] = useState(initialOverview ?? "");
 
   const [markdown, setMarkdown] = useState("");
   const [notice, setNotice] = useState("");

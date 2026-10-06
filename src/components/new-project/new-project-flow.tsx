@@ -178,6 +178,7 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
                 embedded
                 initialTopic={basicInfo.projectName}
                 initialSubject={basicInfo.intervieweeName}
+                initialOverview={basicInfo.overview}
                 onContinue={() => {
                   // workspace 的「确认 / 跳过」会用提纲表单的字段整体覆盖草稿
                   // （saveOutlineDraftToSession 是重建而非 merge），这里把基本信息的

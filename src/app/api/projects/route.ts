@@ -15,6 +15,10 @@ import {
 import { saveInterviewAudio } from "@/lib/server/upload-store";
 import type { RedactionRule, UserType } from "@/lib/types/project";
 
+// 与 /api/outline/generate、/api/projects/ai-interview 保持同口径的 notes 上限。
+// route 文件之间不互相 import，各自本地定义；不要新建共享模块。
+const NOTES_MAX_LENGTH = 1000;
+
 function parseCustomRedactionRules(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !value.trim()) {
     return ["phone", "id_card", "address", "contact_account"] as RedactionRule[];
@@ -80,7 +84,9 @@ export async function POST(request: Request) {
       formData.get("institutionName")?.toString().trim() ?? "";
     const customScenarioLabel =
       formData.get("customScenarioLabel")?.toString().trim() ?? "";
-    const notes = formData.get("notes")?.toString().trim() ?? "";
+    const notes =
+      formData.get("notes")?.toString().trim().slice(0, NOTES_MAX_LENGTH) ??
+      "";
     const outlineDraftMarkdown =
       formData.get("outlineDraftMarkdown")?.toString() ?? "";
     const collectionScenario = parseEnumValue(

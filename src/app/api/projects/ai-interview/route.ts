@@ -14,6 +14,9 @@ import type {
   WorkflowStep,
 } from "@/lib/types/project";
 
+// 与 /api/outline/generate、/api/projects 保持同口径的 notes 上限。
+const NOTES_MAX_LENGTH = 1000;
+
 // 与 api/projects/route.ts 的默认规则保持一致（route 文件之间不能互相 import）。
 const DEFAULT_REDACTION_RULES: RedactionRule[] = [
   "phone",
@@ -150,7 +153,7 @@ export async function POST(request: Request) {
       institutionName: normalizeText(payload.institutionName),
       intervieweeName,
       customScenarioLabel,
-      notes: normalizeText(payload.notes),
+      notes: normalizeText(payload.notes).slice(0, NOTES_MAX_LENGTH),
       outlineDraftMarkdown,
       audioFileName: "",
       audioStoragePath: "",
