@@ -74,7 +74,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "未登录。" }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    let formData: FormData;
+
+    // BUG-11：proxy 克隆请求体的上限（next.config.ts 的 proxyClientMaxBodySize）被击穿时
+    // 请求体会被截断，formData() 抛 undici 的 "Failed to parse body as FormData."。
+    // 不接住这一层，下面 catch 的兜底会把那句英文原文当 message 回给用户。
+    // 与 [projectId]/interview/audio/route.ts 同形：只回人话，不回显内部错误。
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        { message: "请求格式不正确。" },
+        { status: 400 },
+      );
+    }
 
     const audio = formData.get("audio");
     const projectName = formData.get("projectName")?.toString().trim() ?? "";

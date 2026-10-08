@@ -46,6 +46,9 @@ import { useProjectWorkspaceStore } from "@/store/project-workspace";
 import { useAuth } from "@/hooks/useAuth";
 
 const acceptedAudioExtensions = ".mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,audio/*";
+// 与 src/lib/server/upload-store.ts 的 100MB 业务上限同口径（那边是既有实现，本批不动）：
+// 选文件时就挡一道，超限文件不必白跑一次 multipart 上传才被拒。
+const maxAudioBytes = 100 * 1024 * 1024;
 const defaultRules: RedactionRule[] = [
   "phone",
   "id_card",
@@ -329,6 +332,16 @@ export function InterviewUploadForm() {
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
+
+    if (nextFile && nextFile.size > maxAudioBytes) {
+      // 提示文案与服务端的拒收提示同口径，用户看到的是同一句话。
+      setAudioFile(null);
+      setError("演示版本建议上传 100MB 以内的音频文件。");
+      // 清掉原生 input：否则再选同一个超限文件不会触发 change，用户会以为按钮坏了。
+      event.target.value = "";
+      return;
+    }
+
     setAudioFile(nextFile);
     setError(null);
   }
