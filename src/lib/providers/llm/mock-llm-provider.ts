@@ -15,82 +15,60 @@ import type {
   OutlinePlanningContext,
 } from "@/lib/types/outline";
 
-// 把「重大事件 / 时间节点」摊成独立分节。
-// 没有规划上下文时返回空数组，保证不带事件的输出与加这个功能之前逐字节一致。
-function buildPlanningSections(
+// 把「重大事件 / 时间节点」摊成编号问题。
+// UI-27 之后提纲是四段式的平铺编号问题列表：事件不再单开 ## 分节，
+// 而是各自占专属问题（覆盖要求不变，见 Prompt 规则 10）。
+// 没有规划上下文时返回空数组，保证不带事件的输出与加这个功能之前一致。
+function buildPlanningQuestions(
   planningContext?: OutlinePlanningContext,
 ): string[] {
   const { events, timePoints } = normalizeOutlinePlanningContext(planningContext);
-  const lines: string[] = [];
+  const questions: string[] = [];
 
-  if (events.length) {
-    lines.push("## 重大事件脉络", "");
-
-    for (const event of events) {
-      lines.push(`### ${event}`);
-      lines.push(`- 请围绕“${event}”还原当时的时间、地点、在场人物与您的处境。`);
-      lines.push("- 这件事之后，您的生活、家庭或工作发生了哪些变化？", "");
-    }
+  for (const event of events) {
+    questions.push(
+      `请围绕“${event}”还原当时的时间、地点、在场人物与您的处境。`,
+      `“${event}”发生之后，您的生活、家庭或工作发生了哪些变化？`,
+    );
   }
 
-  if (timePoints.length) {
-    lines.push("## 时间节点", "");
-
-    for (const timePoint of timePoints) {
-      lines.push(`- ${timePoint}：确认当时的主要经历、人物关系与情绪状态。`);
-    }
-
-    lines.push("");
+  for (const timePoint of timePoints) {
+    questions.push(`${timePoint}前后，您的主要经历、人物关系与情绪状态是怎样的？`);
   }
 
-  return lines;
+  return questions;
 }
 
+// UI-27：四段式提纲 —— 标题 / 引言段 / 编号问题列表（字面「1、」）/ 落款。
+// 与 08_访谈提纲与成文稿格式要求 表1 对齐：不再出现 ## 章节、### 子节与 - 条目。
 function buildOutlineMarkdown(input: LlmOutlineChatInput) {
   const profile = normalizeOutlineProfile(input.profile);
   const scenarioLabel = getInterviewScenarioLabel(profile.collectionScenario);
   const focus = profile.researchFocus || "待进一步明确研究焦点";
-  const subject = profile.intervieweeName || "待确认受访对象";
-  const projectName = profile.projectName || `${scenarioLabel}口述访谈提纲草案`;
+  const subject = profile.intervieweeName || profile.projectName || "受访者";
+  const institution = profile.institutionName || "待补充整理机构";
+
+  const questions = [
+    `请您先介绍一下自己与这次口述主题“${focus}”之间最直接的关联。`,
+    "您最先想到的时间、地点和人物是谁？",
+    "当时发生了什么？您当时的生活状态是怎样的？",
+    "哪些场景、物件、声音或人物最能代表那段经历？",
+    "在关键转折前后，您的家庭、工作或周边环境有什么变化？",
+    ...buildPlanningQuestions(input.planningContext),
+    "回看这段经历，您觉得最难忘或最想保留的感受是什么？",
+    "面向未来，您对这段历史或这件事还有什么建议？",
+    "还有哪些内容您觉得需要补充？",
+  ];
 
   return [
-    `# ${projectName}`,
+    `# ${subject}访谈提纲`,
     "",
-    "## 访谈概况",
-    `- 口述场景：${scenarioLabel}`,
-    `- 受访对象：${subject}`,
-    `- 整理机构：${profile.institutionName || "待补充"}`,
-    `- 研究焦点：${focus}`,
+    `非常感谢您接受我们的访谈。本次访谈围绕“${focus}”展开，用于${scenarioLabel}的资料整理。访谈过程中如有任何不适，请随时告知，我们可以随时暂停或跳过任何问题；访谈内容仅用于本项目资料整理，涉及姓名、住址等个人信息时会做匿名处理。`,
     "",
-    "## 访谈目标",
-    `1. 明确与“${focus}”相关的个人记忆主线与关键事件。`,
-    "2. 补充时间、地点、人物关系和场景细节，便于后续结构化整理。",
-    "3. 关注情绪波动区段，保证提问节奏平稳、尊重受访者感受。",
+    ...questions.map((question, index) => `${index + 1}、${question}`),
     "",
-    ...buildPlanningSections(input.planningContext),
-    "## 核心提问路径",
-    "### 第一阶段：进入记忆",
-    `- 请您先介绍一下自己与这次口述主题“${focus}”之间最直接的关联。`,
-    "- 您最先想到的时间、地点和人物是谁？",
-    "",
-    "### 第二阶段：展开关键经历",
-    "- 当时发生了什么？您当时的生活状态是怎样的？",
-    "- 哪些场景、物件、声音或人物最能代表那段经历？",
-    "- 在关键转折前后，您的家庭、工作或周边环境有什么变化？",
-    "",
-    "### 第三阶段：情感与影响",
-    "- 回看这段经历，您觉得最难忘或最想保留的感受是什么？",
-    "- 有没有哪些片段在讲述时会让您感到不适，需要我们放慢节奏？",
-    "",
-    "## 现场提示",
-    "- 重点记录明确年份、地点、身份关系与事件顺序。",
-    "- 对涉及隐私的姓名、住址、联系方式即时做标记。",
-    "- 受访者出现长时间停顿或情绪波动时，优先安抚再继续提问。",
-    "",
-    "## 待补充信息",
-    "- 受访对象的基本背景",
-    "- 关键历史阶段或时间节点",
-    "- 是否存在需重点保护的隐私边界",
+    institution,
+    "日期待补",
   ].join("\n");
 }
 
@@ -117,7 +95,8 @@ function resolveMockOutlineMarkdown(input: LlmOutlineChatInput) {
     throw new Error("mock outline chat failure");
   }
 
-  return `${base}\n\n## 对话调整记录\n- 按「${lastUser.content}」调整。`;
+  // UI-27：四段式里不能再追加 ## 章节，改动痕迹改成一句纯文本注记。
+  return `${base}\n\n（已按「${lastUser.content}」调整）`;
 }
 
 function getMissingPrompt(input: LlmOutlineChatInput) {

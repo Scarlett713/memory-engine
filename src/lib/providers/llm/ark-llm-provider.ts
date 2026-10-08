@@ -14,7 +14,10 @@ import {
   sensitiveMarkTypes,
   type SensitiveMarkType,
 } from "@/lib/types/project";
-import type { OutlineChatResult } from "@/lib/types/outline";
+import type {
+  OutlineChatResult,
+  OutlineProjectProfile,
+} from "@/lib/types/outline";
 
 function getRequiredEnv(name: string) {
   const value = process.env[name]?.trim();
@@ -244,6 +247,27 @@ type ArkResponsePayload = {
   }>;
 };
 
+// UI-27：模型没给出可用提纲时的兜底草稿，必须是四段式
+// （标题 / 引言段 / 编号问题 / 落款）。否则「输出异常」这一支会把 ## 章节式的旧格式
+// 重新带回页面，与 08_访谈提纲与成文稿格式要求 表1 冲突。
+function buildOutlineFallback(profile: OutlineProjectProfile) {
+  return [
+    "# 访谈提纲草案",
+    "",
+    "非常感谢您接受我们的访谈。本提纲用于整理受访者的相关经历与记忆。访谈过程中如有任何不适，请随时告知，我们可以随时暂停或跳过任何问题；访谈内容仅用于本项目资料整理，涉及姓名、住址等个人信息时会做匿名处理。",
+    "",
+    "1、请您先介绍一下自己与本次访谈主题之间的关联。",
+    "2、您最先想到的时间、地点和人物是谁？",
+    "3、当时的具体情形是怎样的？您当时的生活状态如何？",
+    "4、这段经历前后，您的家庭、工作或周边环境发生了什么变化？",
+    "5、回看这段经历，您最难忘或最想保留下来的是什么？",
+    "6、还有哪些内容您觉得需要补充？",
+    "",
+    profile.institutionName || "口述史课题组",
+    "日期待补",
+  ].join("\n");
+}
+
 export class ArkLlmProvider implements LlmProvider {
   private readonly apiUrl =
     process.env.LLM_API_URL?.trim() ||
@@ -403,16 +427,30 @@ export class ArkLlmProvider implements LlmProvider {
           researchFocus: "",
           notes: "",
         },
-        outlineMarkdown: "## 访谈目标\n- 了解受访者的搬迁经历",
+        outlineMarkdown: [
+          "# 陈秀兰访谈提纲",
+          "",
+          "非常感谢您接受我们的访谈。本次访谈由口述史课题组组织，用于整理受访者的相关经历与记忆。访谈过程中如有任何不适，请随时告知，我们可以随时暂停或跳过任何问题；访谈内容仅用于本项目资料整理，涉及姓名、住址等个人信息时会做匿名处理。",
+          "",
+          "1、您能先介绍一下自己与这次访谈主题之间的关联吗？",
+          "2、在这段经历里，您印象最深的是什么？",
+          "",
+          "口述史课题组",
+          "2026年10月8日",
+        ].join("\n"),
       }),
       "Rules:",
       "1. assistantMessage should sound like a conversation partner and ask at most one next question when needed.",
       "2. readiness must be one of collecting, drafting, ready.",
       "3. profile should merge the current known information and infer fields only when strongly supported by the conversation.",
-      "4. outlineMarkdown must follow this exact heading hierarchy: use ## for major sections (访谈目标、开场问题、核心议题、情绪安全提示、现场记录提醒), use ### for subsections or specific topics within each section, use - for bullet points under subsections. Do not use # (h1) at all. Do not use bold (**text**) as a substitute for headings.",
-      "5. The outline should cover interview goals, opening questions, deep-dive sections, emotion safety prompts, and on-site note reminders.",
-      "6. Every event listed in planning context events, and every entry in timePoints, must be covered by its own dedicated subsection or bullet. Do not merge them into one generic section.",
-      "7. Section titles must be in Chinese. Use ## 访谈目标, ## 开场问题, ## 核心议题（可按事件/时期分 ### 子节）, ## 情绪安全提示, ## 现场记录提醒. Bullets under 开场问题 and 核心议题 must each be a complete, natural Chinese question ending with 「？」. Bullets under 情绪安全提示 and 现场记录提醒 are reminders, not questions — write them as plain Chinese statements without 「？」.",
+      "4. outlineMarkdown must consist of exactly four parts, in this order, and nothing else: (a) one title line — the only line in the document that starts with `#`, written as `# <受访者姓名或主题>访谈提纲`; (b) one introduction paragraph of plain running text; (c) the question list; (d) a closing signature block. No other heading, section, note or commentary may be added.",
+      "5. The introduction paragraph is one paragraph of plain running text — never bullets, never numbered. It must say who runs this interview and why (project, publication or research purpose), and it must end with the ethics and record notice: the interviewee may pause the interview at any time and may skip any question, and the recording / notes are used only for this project with names, addresses and other personal details anonymised. For example: 「访谈过程中如有任何不适，请随时告知，我们可以随时暂停或跳过任何问题；访谈内容仅用于本项目资料整理，涉及姓名、住址等个人信息时会做匿名处理。」",
+      "6. The question list is one question per line. Every line starts with the literal Chinese numbering `1、`, `2、`, `3、` … in ascending order with no gap and no repeat, and each line is one complete, natural, spoken Chinese question ending with 「？」. A line may carry two closely related 「？」 clauses when a real interviewer would ask them together. Order the questions the way the interview flows: background and warm-up first, the core experience in the middle, feelings / reflection / advice last.",
+      "7. Never use any Markdown structural marker other than the single `#` title line: `##`, `###`, `-`, `*`, `+`, `1.` (Markdown ordered list), `>` and tables are all forbidden, and the 「1、」 prefixes are plain text rather than a Markdown list. Do not use bold (**text**), italics, code spans or links anywhere.",
+      "8. Do not group the questions under section headings. The headings 访谈目标 / 开场问题 / 核心议题 / 情绪安全提示 / 现场记录提醒 must never appear — 情绪安全与现场记录的要求只能写进第 5 条规定的引言段那句话里。",
+      "9. The signature block is the last two plain lines of the document: the organising institution on the first line, and the interview date on the second line. Write the date as 「2026年10月8日」 when a date is known; if not, write 「日期待补」 — never invent a factual date.",
+      "10. Every event listed in planning context events, and every entry in timePoints, must be named inside its own dedicated numbered question (quote the event wording directly). Never drop them, and never merge them all into one generic question.",
+      "11. When the conversation history asks for an adjustment (wording, order, scope or focus), return the whole four-part outlineMarkdown again with that adjustment applied in place. Never append a change log, an edit summary or an extra section to the outline.",
       "Current profile:",
       JSON.stringify(profile),
       "Planning context (events / time points the outline must cover):",
@@ -435,7 +473,7 @@ export class ArkLlmProvider implements LlmProvider {
         readiness: input.currentOutline.trim() ? "drafting" : "collecting",
         checkpoints: ["模型输出未完全结构化，建议人工继续完善"],
         profile,
-        outlineMarkdown: input.currentOutline.trim() || "# 访谈提纲草案\n\n- 待补充访谈背景",
+        outlineMarkdown: input.currentOutline.trim() || buildOutlineFallback(profile),
       };
     }
 
@@ -455,7 +493,7 @@ export class ArkLlmProvider implements LlmProvider {
     const outlineMarkdown =
       typeof parsed.outlineMarkdown === "string" && parsed.outlineMarkdown.trim()
         ? parsed.outlineMarkdown
-        : input.currentOutline || "# 访谈提纲草案\n\n- 待补充访谈背景";
+        : input.currentOutline || buildOutlineFallback(profile);
 
     return {
       assistantMessage,
