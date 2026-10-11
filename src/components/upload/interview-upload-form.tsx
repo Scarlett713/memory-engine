@@ -90,6 +90,136 @@ const wizardSteps: Array<{ step: WizardStep; label: string }> = [
 // href 属性可断言，且历史栈语义确定（不用 router.back()，见 PRD §4.3）。
 const ROUTE_STEP_HREF = "/projects/new?step=route";
 
+// UI-06 v2：知情同意弹窗 3 处文案 ＋《个人信息处理说明》全文常量。
+// 全部走常量而非内联字面量 —— 与 ROUTE_STEP_HREF（:88-91）同一理由：
+// 文案一旦内联进 JSX，「换行 ＋ 缩进」会被折叠成一个空格（可能凭空造出
+// 带空格的斜杠字面），且逐字定稿无法被脚本按「整行相等」核验。
+// 改任一字面，必须同批改：docs/PRD_UI-06_知情同意弹窗.md §4 ＋ 本单 §0.6
+// ＋ 3 支探针（本单 §1.2-1.4；授权行见 §0.4 A8）。
+const CONSENT_BODY_1 =
+  "平台将通过云端技术服务，对您本次录制或上传的口述资料进行智能转写、要素标引与校订脱敏，并为您提供资料保存与检索服务。";
+const CONSENT_BODY_2 =
+  "平台仅在您授权的范围内处理与使用资料，通过访问权限控制与脱敏处理保护个人信息。如需将资料用于公开展示、图书出版、网络传播等用途，平台将另行征求您的同意。资料保存期限、云端处理情况及撤回同意、更正与删除的申请方式，详见《个人信息处理说明》。";
+const CONSENT_TICK =
+  "我已阅读并理解《个人信息处理说明》，同意平台按上述目的与方式处理本次口述资料。";
+const CONSENT_BUTTON_LABEL = "同意并继续";
+
+type ConsentDocBlock =
+  | { kind: "title" | "h1" | "h2" | "p"; text: string }
+  | { kind: "table"; head: string[]; rows: string[][] };
+
+// 《个人信息处理说明》（更新/生效日期 2026年10月8日）逐字全文，73 块 ＝
+// Title 1 ＋ 章标题 9（h1 → <h3>）＋ 小节标题 6（h2 → <h4>）＋ 正文段 52 ＋ 表格 5。
+// 纯文本 4,124 字符（正文段 2,704 ＋ 表格单元格 1,420）。
+// docx 的 5 个官方链接以 HYPERLINK 字段码存在 ⇒ 此处只有链接标签文字、无 URL（PRD §4.2）。
+const CONSENT_DOC_BLOCKS: ConsentDocBlock[] = [
+  { kind: "title", text: "个人信息处理说明" },
+  { kind: "p", text: "更新日期：2026年10月8日" },
+  { kind: "p", text: "生效日期：2026年10月8日" },
+  { kind: "p", text: "“记忆引擎”平台提供口述采集、智能转写、要素标引、校订脱敏、资料检索与成果转化服务。本说明介绍个人信息的处理范围、云端服务、保存规则与权利申请方式。" },
+  { kind: "h1", text: "处理主体" },
+  { kind: "p", text: "平台运营主体：复旦大学“记忆引擎”智述时光项目组" },
+  { kind: "p", text: "联系电话：17376590989" },
+  { kind: "p", text: "联系地址：上海市杨浦区邯郸路220号" },
+  { kind: "p", text: "您可以通过上述电话联系我们，咨询资料处理规则，或提出查阅、复制、更正、删除与撤回同意的申请。" },
+  { kind: "h1", text: "处理的信息" },
+  { kind: "p", text: "平台根据您选择的服务，处理以下信息：" },
+  { kind: "table", head: ["信息类别", "具体内容"], rows: [
+    ["口述资料", "本次录制或上传的音视频、文字与补充材料，以及其中涉及的人物经历、家庭关系、工作经历等信息"],
+    ["整理成果", "转写稿、校订稿、时间戳、要素标引、检索索引与经授权形成的转化成果"],
+    ["项目信息", "项目名称、访谈主题、成果用途、授权范围与保存期限"],
+    ["服务记录", "处理进度、修改记录、审核记录、授权变更与必要的操作日志"],
+  ] },
+  { kind: "p", text: "平台按照具体服务需要处理信息。您可以根据记录目的选择使用真实姓名、化名或隐去姓名，减少提交与本次服务无关的个人信息。" },
+  { kind: "h1", text: "处理目的与方式" },
+  { kind: "p", text: "口述采集：根据您的操作录制音视频，或接收您上传的口述资料。" },
+  { kind: "p", text: "智能转写：将语音转写为文字，形成时间戳、文本分段与说话人区分等信息。" },
+  { kind: "p", text: "要素标引：识别与整理时间、地点、人物、事件、机构与主题，便于资料查考。" },
+  { kind: "p", text: "校订脱敏：辅助标记转写疑点、存疑信息与敏感内容，按服务约定开展人工校订、复核与脱敏处理。" },
+  { kind: "p", text: "资料检索：在授权范围内提供分类浏览、关键词检索、全文检索、语义检索与内容定位。" },
+  { kind: "p", text: "成果转化：根据您的需求与授权，将整理后的资料转化为回忆录、口述史编研稿、展览文本、视频脚本与音频故事等成果。" },
+  { kind: "p", text: "AI处理结果可能存在错误、遗漏或表达偏差。涉及人名、地名、时间、事件与敏感内容的结果，应结合原始资料核对；听辨不清或尚未核实的内容保留说明。" },
+  { kind: "h1", text: "云端技术服务" },
+  { kind: "p", text: "平台使用阿里云技术服务完成语音识别、文本处理、向量检索、资料存储与应用运行。调用时，仅传输完成对应任务所需的信息。" },
+  { kind: "h2", text: "服务提供方及产品" },
+  { kind: "table", head: ["处理用途", "服务提供方及产品", "涉及信息"], rows: [
+    ["语音识别", "阿里云百炼：Paraformer-v2、Paraformer-realtime-v2", "待转写音频、实时语音与必要的识别参数"],
+    ["语音合成", "阿里云百炼：CosyVoice-v2", "需要播报的访谈提问与提示文本"],
+    ["文本处理", "阿里云百炼：通义千问Qwen-Plus", "待整理文字、必要的上下文与处理指令"],
+    ["向量生成", "阿里云百炼：text-embedding-v4", "用于建立检索索引的文本片段与检索问题"],
+    ["向量检索", "阿里云向量检索服务DashVector", "文本向量、资料编号、必要的标引字段与检索条件"],
+    ["存储备份", "阿里云对象存储OSS", "原始音视频、整理文稿、转化成果与备份资料"],
+    ["应用运行", "阿里云云服务器ECS", "项目信息、处理任务、权限设置与必要的运行日志"],
+  ] },
+  { kind: "p", text: "语音合成用于播报提问与提示，采用服务商提供的声音，不以本次口述资料开展声音克隆。" },
+  { kind: "p", text: "科大讯飞为可研报告中的语音识别备选服务。正式启用前，平台将补充具体产品、处理范围与相关说明，并告知您。" },
+  { kind: "h2", text: "服务条款与保存规则" },
+  { kind: "table", head: ["服务产品", "保存与处理规则", "官方说明"], rows: [
+    ["阿里云百炼", "根据法律法规留存模型与应用调用数据；业务数据的处理、删除与服务终止后的保留，按服务协议执行。平台使用模型API开展处理，不将资料提交至个人聊天产品", "阿里云百炼服务协议、合规资质与隐私说明"],
+    ["DashVector", "按平台指令保存、修改与删除检索数据；释放服务、终止服务或欠费后的数据处理，按协议及产品缓冲期规则执行", "阿里云向量检索服务协议"],
+    ["OSS", "保存期限由平台设置的存储规则控制。删除资料时，同步处理相应历史版本与备份，避免仅删除当前版本而继续保留旧版本", "对象存储OSS服务协议"],
+    ["ECS", "应用数据与系统备份由平台管理；服务终止、实例释放与数据清理按云服务器协议及相应产品规则执行", "阿里云云服务器服务协议"],
+  ] },
+  { kind: "p", text: "平台保存期限与服务商依法留存调用记录的期限分别管理。平台办理删除时，将清理自主管理的资料，并向受托服务商提出适用的删除要求；依法需要保留的记录，按相应规则限制使用。" },
+  { kind: "h2", text: "模型训练" },
+  { kind: "p", text: "本次授权用于口述资料处理与约定的保存服务，不包含模型训练。" },
+  { kind: "p", text: "平台不将您的原始音视频、未公开文稿与个人信息用于模型训练。依据阿里云百炼现行服务协议，服务商不得未经授权将客户业务数据用于模型训练。建立文本向量与检索索引，是为了完成本项目资料检索，不属于模型训练。" },
+  { kind: "p", text: "后续如开展模型训练，平台将另行说明资料范围、训练用途、参与方与保存规则，并依法取得相应授权。" },
+  { kind: "h1", text: "敏感信息与他人资料" },
+  { kind: "p", text: "口述资料可能涉及医疗健康、宗教信仰、金融账户、行踪轨迹等敏感个人信息。确需处理此类信息时，平台将说明处理的必要性与对个人权益的影响，并依法取得单独同意。" },
+  { kind: "p", text: "您可以跳过有关问题、暂停录制或结束访谈。敏感内容的处理与公开范围，可以分别选择。" },
+  { kind: "p", text: "您代他人录制或上传资料时，应向受访者说明录音、云端处理、整理用途与保存规则，并取得相应授权。涉及第三方个人信息的内容，平台将核查使用依据，根据需要限制利用或进行脱敏处理。" },
+  { kind: "p", text: "涉及不满十四周岁未成年人的个人信息，平台将在处理前征得监护人同意，并提供相应的处理说明。" },
+  { kind: "h1", text: "资料使用与公开" },
+  { kind: "p", text: "原始资料与整理成果按项目管理，仅向具有相应权限的用户与工作人员开放。人工校订人员根据任务需要访问资料，并承担保密义务。" },
+  { kind: "p", text: "公开展示、图书出版、网络传播，以及向档案、文旅、教育等机构提供可识别个人身份的资料，须具有对应的授权或其他合法依据。平台将明确使用目的、接收方、资料范围、署名方式与使用期限。" },
+  { kind: "p", text: "脱敏处理用于降低身份识别与隐私泄露风险，不代替公开授权。声音、影像与叙述细节仍可能识别个人，公开前需结合具体内容复核。" },
+  { kind: "h1", text: "资料保存与保护" },
+  { kind: "h2", text: "存储地域" },
+  { kind: "p", text: "平台云端服务采用中国境内的华北2（北京）地域，原始资料与整理成果存储于该地域的OSS，检索数据存储于DashVector，应用运行使用ECS。异地备份限定在中国境内。" },
+  { kind: "p", text: "平台使用境内模型服务接口。本服务不安排个人信息出境；后续如需变更，将另行履行告知与相应程序。" },
+  { kind: "h2", text: "保存期限" },
+  { kind: "p", text: "资料保存以授权目的与必要期限为依据。您可以选择保存服务、申请较短期限或提前删除资料。" },
+  { kind: "table", head: ["保存类别", "保存期限", "适用范围与起算方式"], rows: [
+    ["基础保存", "3年", "个人、家庭与一般机构选择基础保存服务的资料，自成果确认或项目验收之日起计算"],
+    ["延长保存", "5年", "需要持续补充、查考或再次利用的资料，经确认选择延长保存服务后，自成果确认或项目验收之日起计算"],
+    ["项目保存", "10年", "具有持续查考需求的机构项目资料，经书面约定保存范围与期限后，自项目验收之日起计算"],
+    ["过程资料", "项目结束后30日内清理", "临时音频片段、中间文件与无保留必要的重复稿件；具有校订或审核依据价值的版本随项目资料保存"],
+    ["授权记录", "保存服务期间及结束后3年", "保存证明授权范围、变更情况与申请处理结果所需的最少信息"],
+    ["安全日志", "至少6个月", "用于安全排查的访问与操作记录；法律法规要求更长期限的，按相应要求执行"],
+    ["备份资料", "随主资料期限管理", "主资料删除后停止日常访问，在30日内完成平台自主管理备份中的清理；依法需要保留的除外"],
+  ] },
+  { kind: "p", text: "3年、5年与10年为平台提供的保存服务期限，并非对全部口述史料统一规定的档案保管期限。" },
+  { kind: "p", text: "需正式归档的口述史料，由委托单位依据《口述史料采集与管理规范》及本单位制度，确定永久、30年或10年的保管期限。平台按约定完成移交；需要继续托管的，另行明确保存责任与服务期限。" },
+  { kind: "p", text: "订阅服务到期后，平台提供30日资料导出期。您可以续订或选择单独的保存服务；未继续选择服务的，平台在导出期结束后按上述规则清理资料。" },
+  { kind: "p", text: "保存期满前30日，平台提醒您办理导出、续期或移交。处理目的已经完成、授权撤回或依法应当删除时，平台按申请与法律要求提前处理。" },
+  { kind: "h2", text: "安全措施" },
+  { kind: "p", text: "平台按照可研报告的安全方案设置以下措施：" },
+  { kind: "p", text: "传输保护：平台访问与云端调用使用HTTPS/TLS加密传输；资料下载使用限时授权链接。" },
+  { kind: "p", text: "加密存储：原始音视频、整理文稿与备份资料启用存储加密，原始资料保留只读副本，校订过程保留版本记录。" },
+  { kind: "p", text: "访问权限：按项目与岗位分配权限，人工审核人员仅访问承担任务所需的资料；管理账号与技术密钥分别管理。" },
+  { kind: "p", text: "项目隔离：通过独立的资料目录、项目标识与检索权限，限制不同项目之间的资料访问。" },
+  { kind: "p", text: "操作日志：记录访问、编辑、导出、删除与授权变更，限制日志访问范围，避免写入完整口述内容与无关敏感信息。" },
+  { kind: "p", text: "资料备份：开展每日增量备份与每周完整备份，设置境内异地备份，定期检查备份完整性与恢复能力。" },
+  { kind: "p", text: "发生或可能发生资料泄露、损毁、丢失时，平台将立即采取补救措施，核实影响范围，并依法履行通知与报告义务。" },
+  { kind: "h1", text: "您的信息管理权利" },
+  { kind: "p", text: "您可以通过项目页面的文本编辑、成果导出、授权管理与资料删除功能管理资料，也可以拨打17376590989提出申请。" },
+  { kind: "table", head: ["申请事项", "办理方式"], rows: [
+    ["查阅复制", "在项目页面查阅资料，通过成果导出获取相应副本；原始资料副本可联系项目组申请"],
+    ["更正补充", "通过文本编辑补充或修改内容；需保留原始记录的，采用校订与说明方式处理"],
+    ["撤回同意", "在授权管理中提交撤回申请，或电话说明需要撤回的处理事项与使用范围"],
+    ["删除资料", "在项目页面提出资料删除申请，或联系项目组办理"],
+    ["咨询投诉", "通过联系电话咨询处理规则，提出异议或投诉"],
+  ] },
+  { kind: "p", text: "受访者即使未注册平台账号，也可以通过联系电话提出有关本人信息的申请。平台仅核验确认申请人身份与资料关联所需的信息。" },
+  { kind: "p", text: "平台在收到申请并完成必要身份核验后，于15个工作日内完成处理并反馈结果。无法按申请办理的，将说明具体原因与处理依据。" },
+  { kind: "p", text: "撤回同意不影响撤回前基于同意开展的合法处理。撤回后，平台停止相应处理；如影响转写、检索或保存服务，将告知受影响的功能。" },
+  { kind: "p", text: "依法仍需保存，或技术上暂时难以删除的信息，平台将限制为必要的存储与安全保护，并说明保留依据及后续处理安排。" },
+  { kind: "h1", text: "说明更新" },
+  { kind: "p", text: "服务提供方、处理目的、信息范围、保存规则或权利申请方式发生变化时，平台将更新本说明，并通过平台提示或项目联系方式告知您。" },
+  { kind: "p", text: "需要重新取得同意的变更，将在取得相应同意后实施。更新本说明不自动扩大您原有的授权范围。" },
+];
+
 // 知情同意弹窗：创建项目的唯一闸口，用户点「我确认」之后才真正发起创建。
 // 不做任何本地记忆 —— 每次点「创建项目」都重新弹，并重置勾选态。
 function ConsentDialog({
@@ -98,12 +228,16 @@ function ConsentDialog({
   onCheckedChange,
   onConfirm,
   onCancel,
+  docOpen,
+  onDocOpenChange,
 }: {
   open: boolean;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  docOpen: boolean;
+  onDocOpenChange: (open: boolean) => void;
 }) {
   useEffect(() => {
     if (!open) {
@@ -164,9 +298,77 @@ function ConsentDialog({
           </h2>
 
           <div className="soft-scroll mt-3 max-h-[min(55vh,24rem)] overflow-y-auto pr-2 text-sm leading-7 text-muted">
-            <p>
-              本平台会对本次口述音频进行本地转写、AI 整理与隐私脱敏处理，处理结果仅用于研究/归档目的。上传前，请确认您已向受访者完整说明上述用途。
-            </p>
+            <p data-ui06-part="body1">{CONSENT_BODY_1}</p>
+            <p data-ui06-part="body2" className="mt-2.5">{CONSENT_BODY_2}</p>
+
+            <button
+              type="button"
+              data-ui06-toggle=""
+              aria-expanded={docOpen}
+              aria-controls="ui06-consent-doc"
+              onClick={() => onDocOpenChange(!docOpen)}
+              className="mt-3 flex w-full items-center gap-1.5 rounded-[0.9rem] px-1 py-1 text-left text-xs font-medium text-accent-strong transition-colors"
+            >
+              <span aria-hidden="true">{docOpen ? "▼" : "▶"}</span>
+              <span className="underline decoration-dotted underline-offset-4">个人信息处理说明</span>
+            </button>
+
+            {docOpen ? (
+              <div
+                id="ui06-consent-doc"
+                data-ui06-doc=""
+                className="ui06-doc mt-2.5 max-h-[240px] overflow-y-auto rounded-[0.9rem] border border-line/70 bg-white/55 px-3 py-2.5 text-xs leading-6 text-muted"
+              >
+                {CONSENT_DOC_BLOCKS.map((block, index) => {
+                  if (block.kind === "table") {
+                    return (
+                      <table key={`t${index}`} className="mt-2 w-full border-collapse text-left">
+                        <thead>
+                          <tr>
+                            {block.head.map((cell, cellIndex) => (
+                              <th key={`h${cellIndex}`} className="border border-line/60 px-2 py-1 font-medium text-foreground">
+                                {cell}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.rows.map((row, rowIndex) => (
+                            <tr key={`r${rowIndex}`}>
+                              {row.map((cell, cellIndex) => (
+                                <td key={`c${cellIndex}`} className="border border-line/60 px-2 py-1 align-top">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  }
+
+                  if (block.kind === "h1") {
+                    return (
+                      <h3 key={`h${index}`} className="mt-3 font-semibold text-foreground">{block.text}</h3>
+                    );
+                  }
+
+                  if (block.kind === "h2") {
+                    return (
+                      <h4 key={`s${index}`} className="mt-2 font-medium text-foreground">{block.text}</h4>
+                    );
+                  }
+
+                  if (block.kind === "title") {
+                    return (
+                      <p key={`t${index}`} className="text-sm font-semibold text-foreground">{block.text}</p>
+                    );
+                  }
+
+                  return <p key={`p${index}`} className="mt-1.5">{block.text}</p>;
+                })}
+              </div>
+            ) : null}
           </div>
 
           <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-[1.15rem] border border-emerald-500/30 bg-white/60 p-3.5 text-sm leading-6 text-foreground">
@@ -177,8 +379,7 @@ function ConsentDialog({
               onChange={(event) => onCheckedChange(event.target.checked)}
             />
             <span>
-              我确认已获得受访者的口头或书面知情同意，受访者已了解本次口述内容将被录音、转写、AI
-              整理，并同意在脱敏处理后用于研究/归档目的。
+              {CONSENT_TICK}
             </span>
           </label>
 
@@ -203,7 +404,7 @@ function ConsentDialog({
               disabled={!checked}
               onClick={onConfirm}
             >
-              我确认
+              {CONSENT_BUTTON_LABEL}
             </Button>
           </div>
         </div>
@@ -297,6 +498,8 @@ export function InterviewUploadForm() {
   const [consentChecked, setConsentChecked] = useState(false);
   // 弹窗开关：Step 3 点「创建项目」时才开，关闭即作废，不落任何存储。
   const [consentOpen, setConsentOpen] = useState(false);
+  // 展开态受控：与勾选态同址复位，保证每次重弹都是收起态（UI-06 PRD §4.5 第 4 条）。
+  const [consentDocOpen, setConsentDocOpen] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -471,6 +674,7 @@ export function InterviewUploadForm() {
 
     // 每次创建都重新确认：先重置勾选态并弹窗，确认后才真正创建。
     setConsentChecked(false);
+    setConsentDocOpen(false);
     setConsentOpen(true);
   }
 
@@ -1006,6 +1210,8 @@ export function InterviewUploadForm() {
         onCheckedChange={setConsentChecked}
         onConfirm={handleConsentConfirm}
         onCancel={handleConsentCancel}
+        docOpen={consentDocOpen}
+        onDocOpenChange={setConsentDocOpen}
       />
     </section>
   );
