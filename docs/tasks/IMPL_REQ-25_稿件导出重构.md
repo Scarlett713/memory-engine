@@ -5,7 +5,7 @@
 > - **探针**：新增 1 支（**出口证据主件**，解 `.docx` 的 `word/document.xml` + `word/footer1.xml`）；回归 1 支（`tmp/verify/bug05-redaction.ts`，本单**零改动**）；**经实测，`tmp/**` 全域无任何脚本断言导出 UI 文案或 docx 内容**（§3.3）⇒ 除新增支外零连带。
 > - **行号基线**：2026-10-13 实测，HEAD = `82b6221`（`master` = `origin/master`，工作区 clean）→ **实施前须复核行号**（口径见 §0.2-②）。
 > - **红线**：不动 `src/lib/writing-rules.ts`、不动脱敏链路、不动 `json` / `txt` 结构、不动 `export/route.ts`（§0.3）。
-> - **状态**：已实施，待验收（2026-10-13）。
+> - **状态**：**已验收（2026-10-13）**（验收来源：总管 2026-10-13 回执 / 产品方实机导出确认；回归基线：`tmp/verify-req25-export-format.mjs` **28 / 28**，Cline 本批复跑）。
 
 ---
 
