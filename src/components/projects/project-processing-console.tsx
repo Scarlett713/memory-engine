@@ -1165,8 +1165,8 @@ export function ProjectProcessingConsole({
                 <p className="mb-3 text-xs text-red-500">{exportError}</p>
               )}
               <div className="grid gap-2">
-                {(['docx', 'txt', 'json'] as const).map((fmt) => {
-                  const labels = { docx: '导出 Word 档案稿 (.docx)', txt: '导出纯文本 (.txt)', json: '导出结构化数据 (.json)' };
+                {(['docx'] as const).map((fmt) => {
+                  const labels = { docx: '导出成文稿 (.docx)', txt: '导出纯文本 (.txt)', json: '导出结构化数据 (.json)' };
                   const isExporting = exportingFormat === fmt;
                   return (
                     <button

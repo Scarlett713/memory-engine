@@ -14,6 +14,7 @@ import type {
   OutlineChatResult,
   OutlinePlanningContext,
 } from "@/lib/types/outline";
+import { resolveWritingTemplate } from "@/lib/writing-rules";
 
 // 把「重大事件 / 时间节点」摊成编号问题。
 // UI-27 之后提纲是四段式的平铺编号问题列表：事件不再单开 ## 分节，
@@ -75,6 +76,35 @@ function buildOutlineMarkdown(input: LlmOutlineChatInput) {
 // 13P1-F 的人为失败开关：mock 下唯一能触发 500 的路径。
 // 仅 LLM_PROVIDER=mock 时可达；#fail 是刻意选的、不会自然出现在修改说明里的串。
 const MOCK_CHAT_FAIL_TOKEN = "#fail";
+
+// REQ-25 裁决 6：mock 同步补五章骨架，否则演示链路导出看不到 08 表 2 的效果。
+// index 与 resolveWritingTemplate({ scenario }).chapters 的顺序一一对应；
+// `?? ""` 兜底：万一章节数变化也不崩（此时该章仅有标题）。
+const MOCK_CHAPTER_DRAFTS = [
+  {
+    body: "受访者出生于上海老城厢，家族在此居住多年。她回忆了旧居周边的街巷格局、居住条件与早年的生活状况。",
+    summary: "受访者出生于上海，家族在老城一带居住多年，回忆了旧居周边的街巷格局与生活条件。",
+  },
+  {
+    body: "受访者重点讲述搬迁前后的家庭经历：母亲在离开旧居前后情绪波动明显，她自己也曾因与老邻居分离而长期感到失落。",
+    summary: "搬迁前后的家庭经历构成本章主线，其中包含明显的情绪波动线索。",
+  },
+  {
+    body: "她描述了石库门居住空间、菜场、夏夜乘凉与邻里交往等民俗细节，并认为这些细节构成了城市记忆的重要部分。",
+    summary: "石库门居住空间、菜场与邻里交往等民俗细节，被受访者视为城市记忆的重要部分。",
+  },
+  {
+    body: "受访者谈到旧区改造后居住条件的改善，也提到新社区人情往来较少。她认为变化既带来了便利，也带走了熟悉的生活节奏。",
+    summary: "受访者对比了改造前后的居住条件与社区关系，对变化持两面评价。",
+  },
+  {
+    body: "受访者表示愿意继续讲述这段记忆，希望后人了解普通人的生活变迁。她认为记忆需要通过讲述与记录传递下去。",
+    summary: "受访者表达了继续讲述的意愿，并强调记忆需要借助讲述与记录传递。",
+  },
+];
+
+// REQ-25 裁决 3 的同一正则；mock 内只用于把标题还原成「无序号」形态。
+const MOCK_CHAPTER_INDEX_PATTERN = /^[一二三四五六七八九十]+、\s*/;
 
 function findLastUserMessage(input: LlmOutlineChatInput) {
   return [...input.messages].reverse().find((message) => message.role === "user");
@@ -227,11 +257,11 @@ export class MockLlmProvider implements LlmProvider {
   async refineTranscript(input: LlmRefineInput): Promise<LlmRefineResult> {
     return {
       provider: "mock",
-      aiDraft: [
-        "受访者回忆，自己早年居住于老城厢，后随家人迁入新式里弄。",
-        "她重点描述了石库门居住空间、菜场、夏夜乘凉与邻里交往等日常生活场景，认为这些细节构成了城市记忆的重要部分。",
-        "谈及搬迁经历时，受访者提到母亲在离开旧居前后情绪波动明显，自己也因与旧邻分离而长期感到失落。",
-      ].join("\n"),
+      aiDraft: resolveWritingTemplate({ scenario: input.scenario })
+        .chapters.map(
+          (chapter, index) => `${chapter}\n${MOCK_CHAPTER_DRAFTS[index]?.body ?? ""}`,
+        )
+        .join("\n\n"),
       summary:
         "受访者围绕老城厢生活、搬迁经历与邻里记忆展开叙述，并在谈及家庭搬迁时出现明显的情绪波动线索。",
       keywords: ["老城厢", "城市迁移", "邻里关系", "家庭记忆", "情绪波动"],
@@ -263,22 +293,12 @@ export class MockLlmProvider implements LlmProvider {
           guidance: "如果继续追问母亲相关经历，宜提供停顿和情绪安抚选项。",
         },
       ],
-      structuredSections: [
-        {
-          heading: "访谈信息",
-          content: `口述场景：${input.scenario}\n研究焦点：${input.researchFocus || "未补充"}\n脱敏级别：${input.privacyLevel}`,
-        },
-        {
-          heading: "关键叙事",
-          content:
-            "受访者以居住空间和邻里互动为主线，串联起城市更新前后的个人生活经验。",
-        },
-        {
-          heading: "伦理与安全提示",
-          content:
-            "搬迁与亲属情绪相关内容可能构成脆弱叙述区段，建议人工复核时注意表述方式。",
-        },
-      ],
+      structuredSections: resolveWritingTemplate({ scenario: input.scenario }).chapters.map(
+        (chapter, index) => ({
+          heading: chapter.replace(MOCK_CHAPTER_INDEX_PATTERN, ""),
+          content: MOCK_CHAPTER_DRAFTS[index]?.summary ?? "",
+        }),
+      ),
       timelineEvents: [
         {
           timeLabel: "青年时期",

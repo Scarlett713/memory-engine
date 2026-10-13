@@ -5,7 +5,7 @@
 > - **探针**：新增 1 支（**出口证据主件**，解 `.docx` 的 `word/document.xml` + `word/footer1.xml`）；回归 1 支（`tmp/verify/bug05-redaction.ts`，本单**零改动**）；**经实测，`tmp/**` 全域无任何脚本断言导出 UI 文案或 docx 内容**（§3.3）⇒ 除新增支外零连带。
 > - **行号基线**：2026-10-13 实测，HEAD = `82b6221`（`master` = `origin/master`，工作区 clean）→ **实施前须复核行号**（口径见 §0.2-②）。
 > - **红线**：不动 `src/lib/writing-rules.ts`、不动脱敏链路、不动 `json` / `txt` 结构、不动 `export/route.ts`（§0.3）。
-> - **状态**：待总管审批 → 待 DS 实施。
+> - **状态**：已实施，待验收（2026-10-13）。
 
 ---
 
@@ -16,7 +16,7 @@
 | # | 开口项 | 裁决（逐字） | 本单落点 |
 | --- | --- | --- | --- |
 | 1 | 成文稿取值 | 取 `manualDraft`。用户在审校页编辑的是 `manualDraft`，这才是人工定稿，导出给用户的应该是最终确认版，不是中间产物 `redactedAiDraft`。 | §1.2-①、§2.5 |
-| 2 | 两行文字模板 | 第一行（访谈对象简介）：`{受访对象姓名}，{项目名称} 受访者。`；第二行（信息行）：`采集时间：{建档时间} \| 整理机构：{整理机构} \| 保密级别：{保密级别}`。字段取现有 payload 中的对应值；字段缺失时写「待补」，不留空。`建档时间` 沿用 BUG-08 口径（`formatDateTime` 钉 `Asia/Shanghai`）。原 11 行元数据表**整体删除**，两行文字替代。 | §1.1-①（删）、§2.3（增） |
+| 2 | 两行文字模板 | 第一行（访谈对象简介）：`{受访对象姓名}，「{项目名称}」受访者。`；第二行（信息行）：`采集时间：{建档时间} \| 整理机构：{整理机构} \| 保密级别：{保密级别}`。字段取现有 payload 中的对应值；字段缺失时写「待补」，不留空。`建档时间` 沿用 BUG-08 口径（`formatDateTime` 钉 `Asia/Shanghai`）。原 11 行元数据表**整体删除**，两行文字替代。 | §1.1-①（删）、§2.3（增） |
 | 3 | 小标题去序号 | **只在导出层剥离**，不动 `writing-rules.ts`（REQ-14 常量被探针锁住）。导出层正则：`replace(/^[一二三四五六七八九十]+、\s*/, '')`，剥离后居中显示。 | §2.4、§0.3-① |
 | 4 | 空章节 | **导出层跳过空章节**（与 UI-23「整理稿隐藏未涉及章节」保持一致）。`writing-rules.ts:186` 的「保留标题 + 本节未涉及」是 LLM 生成侧口径，导出侧另行过滤，两层各自独立，不冲突。 | §2.4、§3.1-C |
 | 5 | 图片说明 | **本期 N/A**，在任务单里标注「表 2 已列、数据源缺失、留 REQ-N 另批」，不实现，不留占位代码。 | §0.3-⑤、§3.1-D |
@@ -57,7 +57,7 @@
 | D-25-4 | 段后距不设 | 全篇不加 `spacing.after`（表 2 未规定） | 不自创参数；固定行距 20 磅本身即提供行间节奏 |
 | D-25-5 | UI 只暴露 docx 的实现方式 | **保留** `formatMeta` 三键与 `handleExport` 的三格式签名（供调试 / 归档），**新增渲染白名单常量**（`panel`：`const visibleFormats: ExportFormat[] = ["docx"]`；`console`：`(['docx'] as const)`），渲染处改用白名单 | 裁决 8「保留在代码里、不在 UI 上暴露」；改渲染集合比删常量更小、更可逆，且不动 `handleExport` 逻辑（§0.3-⑨ 禁改面） |
 
-### 0.5 与 PRD 的偏离 / 待追认（P-25-1 ~ P-25-6）
+### 0.5 与 PRD 的偏离 · 已追认（2026-10-13，全采推荐值）（P-25-1 ~ P-25-6）
 
 > 本单**已按推荐值写入**，供总管在审批时逐条追认或改判；改判的代价均为 1 ~ 2 行。
 
@@ -268,7 +268,7 @@ function createMetadataParagraphs(project: ProjectRecord) {
   const confidentiality = getConfidentialityLevelLabel(project.confidentialityLevel);
 
   return [
-    `${interviewee}，${projectName} 受访者。`,
+    `${interviewee}，「${projectName}」受访者。`,
     // 建档时间沿用 BUG-08 口径（formatDateTime 钉 Asia/Shanghai）；
     // 裁决 9：最近更新本批不进信息行（信息行只三字段）。
     `采集时间：${formatDateTime(project.createdAt)} | 整理机构：${institution} | 保密级别：${confidentiality}`,
@@ -642,7 +642,7 @@ const has = (xml, needle) => xml.includes(needle);
 | A-2 | 存在 `word/footer*.xml` part | PRD §4.6 | 删 `footers` |
 | B-1 | `bodyText` 含 `MANUAL_ONLY_SENTENCE` | 裁决 1 | 改回任何其它草稿源 |
 | B-2 | `bodyText` **不含** `REDACTED_ONLY_SENTENCE` | 裁决 1（反证） | 起手写回退句 → 红 |
-| C-1 | 某段文本恰为 `验证受访者，REQ-25 导出验证项目 受访者。` | PRD §4.2（D-25-3） | 改分隔符／语序 |
+| C-1 | 某段文本恰为 `验证受访者，「REQ-25 导出验证项目」受访者。` | PRD §4.2（D-25-3） | 改分隔符／语序 |
 | C-2 | 某段文本含 `采集时间：` 且含 `整理机构：` 且含 `保密级别：` | 裁决 2 | 拆行／删键 |
 | C-3 | `bodyText` **不含** `最近更新` | 裁决 2 | 加回第三项 |
 | C-4 | `bodyText` **不含** `项目名称` / `研究焦点` / `受访者姓名` | 裁决 2 / 9 | 元信息表复活 |
@@ -718,7 +718,7 @@ const has = (xml, needle) => xml.includes(needle);
 | **S1** | 改 `src/lib/server/project-export.ts`：**自下而上**（`:288-425` 装配段 → `:149-238` → `:136-147` → `:125-134` → `:67-123` → `:35-65` → `:1-33` imports/常量），每段删完即 `npx tsc --noEmit` | `:516 → 约 330` 行；0 error |
 | **S2** | 改 `mock-llm-provider.ts`（§2.6 两处 + 常量区） | mock 五章；`tsc` 0 error |
 | **S3** | 改两处 UI 文案 + `visibleFormats`（§2.7，3 个 diff hunk） | `eslint` 0 problem |
-| **S4** | 新建 `tmp/verify-req25-export-format.mjs`（§3.1），**先跑一次期望全红／部分红**（此时 src 已改完，应全绿；若在 S1 之前跑则可作红基线） | 27 条断言输出 + exit code |
+| **S4** | 新建 `tmp/verify-req25-export-format.mjs`（§3.1），**先跑一次期望全红／部分红**（此时 src 已改完，应全绿；若在 S1 之前跑则可作红基线） | 28 条断言输出 + exit code |
 | **S5** | 静态门 + 回归：`npx tsc --noEmit`、`npx eslint src`、`bug05`、`verify-req14-prompts` | 与 S0 对照，**只允许** `bug05` ③ 日志标题数 3→5 一处差异 |
 | **S6** | 变异自检 §3.4（临时改 → 验红 → 还原），至少跑 M1 / M4 / M5 / M6 四条 | 每次还原后 `git diff` 回到 S5 状态 |
 | **S7** | 收尾：`git status --porcelain`、`git diff --stat` | **恰 5 条**：4 生产文件 + 1 新探针；**不 commit、不 push** |
@@ -807,7 +807,7 @@ git diff --stat
 > **口径**：以上 8 处**只改锚点与「已随 REQ-25 重构」措辞，不改任何既有结论**；改完须逐条 `Select-String` 复核（禁用 `Get-Content`，§0.2-②）。
 > **行号基线（重要）**：表中 `需求登记表.md` 的 4 处行号均为**行号基线 v2.10**；本轮（文档批）登记表升 **v2.11** 并补登 REQ-25 条目后，同区域行号**整体 +56**，实测对应关系为 `:542 → :598`、`:546 → :602`、`:776 → :832`、`:958 → :1014`（**只增不删**，故基线值恒 ≤ 现址）。实施轮**一律按文本 `Select-String` 定位、勿按行号跳转**，并在回写时顺带把行号更新为实施轮实测值。另：`IMPL_REQ-28-E` 全名为 `docs/tasks/IMPL_REQ-28-E_项目详情页文案与UI-08-17.md`，`PRD_REQ-14` 全名为 `docs/PRD_REQ-14_AI辅助访谈.md`（两者本轮**未改动**，实施轮回写）。
 
-### 6.3 待总管追认（同批已按推荐值写入，改判成本 1–2 行）
+### 6.3 已追认（2026-10-13，全采推荐值）（同批已按推荐值写入，改判成本 1–2 行）
 
 **P-25-1**（移除 txt/json 两个 UI 按钮）｜**P-25-2**（主标题保留 `${项目名称} 档案整理稿`）｜**P-25-3**（文件名保持 `{项目名}-archive.docx`）｜**P-25-4**（空态文案改「暂无成文稿。」）｜**P-25-5**（不设段后距）｜**P-25-6**（删副标题）。逐条见 §0.5。
 

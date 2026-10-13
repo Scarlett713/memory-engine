@@ -25,7 +25,7 @@
    - `src/app/api/projects/route.ts:108-110`（`collectionScenario` 裸 cast）+ `:113-115`（`privacyLevel` 裸 cast）
    - `src/proxy.ts` BUG-06：未登录/失效 token 访问 `/api/*` 应返 `401`，不应 `307`
 9. 与 UI-07 的边界：本期**不改**存量处理台情绪面板与导出中的情绪字段（§0.2、§0.4 依旧冻结）。
-   - REQ-14 的情绪语义收敛**只作用于新增 sidecar 出参与访谈控制台**；存量「建议：{guidance}」（`project-processing-console.tsx:239`、`project-export.ts:359` / `:474`）的调整属 **UI-07**，需先裁决是否解冻 §0.2 / §0.4。
+   - REQ-14 的情绪语义收敛**只作用于新增 sidecar 出参与访谈控制台**；存量「建议：{guidance}」（`project-processing-console.tsx:239`、`project-export.ts` **仅 `txt` 侧保留** —— 原 `:359` 属 REQ-25 于 2026-10-13 删除的段，`:474` 实测现为 `:322`）的调整属 **UI-07**，需先裁决是否解冻 §0.2 / §0.4。
 
 > **已确认技术约束（已拍板，不可更改）**：
 > ① 录音 **WAV**（单声道 16kHz / 16bit），**≈1.9 MB/min、50 分钟上限**（精确值 1.92 MB/min、100MB ≈ 52 分钟、45 分钟起提示，见 §12）；

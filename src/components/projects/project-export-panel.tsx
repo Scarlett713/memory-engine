@@ -20,7 +20,7 @@ const formatMeta: Record<
   }
 > = {
   docx: {
-    label: "导出 Word 档案稿",
+    label: "导出成文稿",
     icon: Download,
   },
   txt: {
@@ -32,6 +32,9 @@ const formatMeta: Record<
     icon: FileCode2,
   },
 };
+
+// REQ-25 裁决 8：UI 只暴露成文稿下载；txt / json 保留在代码中供调试与归档。
+const visibleFormats: ExportFormat[] = ["docx"];
 
 function readFileNameFromHeader(header: string | null, fallback: string) {
   if (!header) {
@@ -122,12 +125,12 @@ export function ProjectExportPanel({ project }: ProjectExportPanelProps) {
           </h3>
         </div>
         <p className="text-sm text-muted">
-          支持 `.docx`、`.txt` 和结构化 `.json` 三种导出格式。
+          下载 Word 格式成文稿（.docx）
         </p>
       </div>
 
       <div className="mt-4 grid gap-3">
-        {(Object.keys(formatMeta) as ExportFormat[]).map((format) => {
+        {visibleFormats.map((format) => {
           const config = formatMeta[format];
           const Icon = config.icon;
           const isLoading = isPending && activeFormat === format;
