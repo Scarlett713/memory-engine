@@ -29,6 +29,11 @@ const SONG_FONT = { ascii: "宋体", eastAsia: "宋体", hAnsi: "宋体", cs: "�
 // 固定值 20 磅（EXACT 下 1 单位 = 1/20 磅）；1.5 倍行距（AUTO 下 1 单位 = 1/240 行）。
 const EXACT_20PT = { line: 400, lineRule: LineRuleType.EXACT };
 const LINE_1_5 = { line: 360, lineRule: LineRuleType.AUTO };
+// BUG-13：小标题段前 / 段后显式固定值 —— before / after 的单位是 twips（1/20 磅），
+// 与 LINE_1_5 的 line: 360 不是一把尺（那个是 AUTO 口径的 1/240 行）。
+// 视觉上「段前段后一致」由 before 单独补偿：AUTO 1.5 倍行盒的余量落在文字下方（缺陷「段后宽」之由来），
+// 故 after 取 0 —— 下方留白已由行盒自身提供，再加只会两侧同抬、不改变二者差值。
+const HEADING_SPACING = { ...LINE_1_5, before: 180, after: 0 };
 // 小四（12pt）首行缩进 2 字符 = 24pt = 480 twips。
 const FIRST_LINE_2CHARS = { firstLine: 480 };
 // 字号（半磅）：三号 32 / 四号 28 / 小四 24。
@@ -85,7 +90,7 @@ function createBodyParagraphs(lines: string[]) {
 function createHeadingParagraph(title: string) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: LINE_1_5,
+    spacing: HEADING_SPACING,
     children: [
       new TextRun({
         text: stripChapterIndex(title),

@@ -6,6 +6,7 @@
 > - **行号基线**：2026-10-13 实测，HEAD = `82b6221`（`master` = `origin/master`，工作区 clean）→ **实施前须复核行号**（口径见 §0.2-②）。
 > - **红线**：不动 `src/lib/writing-rules.ts`、不动脱敏链路、不动 `json` / `txt` 结构、不动 `export/route.ts`（§0.3）。
 > - **状态**：**已验收（2026-10-13）**（验收来源：总管 2026-10-13 回执 / 产品方实机导出确认；回归基线：`tmp/verify-req25-export-format.mjs` **28 / 28**，Cline 本批复跑）。
+> - **后续（2026-10-13，BUG-13 实施轮）**：该探针随 **BUG-13**（小标题段前 / 段后间距修复）**追加 D-9 / D-10 / D-11** 三条 ⇒ **本节所记「28 条」的口径已扩至 31 条**（既有 28 条**零改动**，本机复跑 31 PASS / 0 FAIL / exit 0），见 `docs/tasks/IMPL_BUG-13_小标题间距修复.md` §1.2 / §3 / §5.2-②。**本单结论与验收基线不变**，仅计数随批前移。
 
 ---
 
@@ -634,7 +635,9 @@ const bodyText = allText(documentXml);
 const has = (xml, needle) => xml.includes(needle);
 ```
 
-**断言清单（27 条／A–J 十组）**
+**断言清单（31 条／A–J 十组）**
+
+> **计数说明**：本单原始清单为 **28** 条（原文标题误记为「27 条」，本版按实数更正）；**D-9 / D-10 / D-11** 三条由 **BUG-13**（小标题段前 / 段后间距修复）于 **2026-10-13** 追加，载体 = `HEADING_SPACING`，见 `docs/tasks/IMPL_BUG-13_小标题间距修复.md` §1.2 / §3。**既有 28 条零改动。**
 
 | # | 断言 | 依据 | 变异（改坏了会红） |
 | --- | --- | --- | --- |
@@ -655,6 +658,9 @@ const has = (xml, needle) => xml.includes(needle);
 | D-6 | 正文段（`MANUAL_ONLY_SENTENCE` 所在段）含 `<w:sz w:val="24"/>` / `<w:jc w:val="both"/>` / `w:line="400"` / `w:lineRule="exact"` / `w:firstLine="480"` | 表 2 ②③ | 正文参数漂移 |
 | D-7 | `documentXml` 中 `w:ascii="宋体"` 出现且 `w:ascii="Arial"` **0 次** | 表 2 ⑥ | 字体回退到旧值 |
 | D-8 | `stylesXml` 中 `w:ascii="Arial"` **0 次**，且 `w:ascii="宋体"` 出现 | 表 2 ⑥（默认样式） | 删 `styles.default` |
+| D-9 | 小标题段含 `w:before="180"`（段前显式固定值） | **BUG-13 追加**（任务单 §1.2 / §3；载体 `HEADING_SPACING`） | 删 / 改 `before` |
+| D-10 | 小标题段含 `w:after="0"`（段后 0；`docx` 的属性过滤只丢 `undefined`，**0 会如实写出**） | **BUG-13 追加**（同上） | 删 `after` / 改成非 0 值 |
+| D-11 | `documentXml` 中 `w:before=` / `w:after=` **各恰等于小标题段数**，且每个小标题段各 1 处（＝ 段前 / 段后只出现在小标题 ⇒ 约束① **单点控制**） | **BUG-13 追加**（任务单 §1.2 约束①） | 把 `before` / `after` 误加到正文 / 简介行 / 信息行 |
 | E-1 | 存在段落文本恰为 `地域概况与历史沿革`（无序号） | 裁决 3 | 去掉 `replace` |
 | E-2 | `bodyText` 不匹配 `/^[一二三四五六七八九十]+、/m` 且不含 `一、地域概况` | 裁决 3 | 序号回落到正文 |
 | F-1 | 不存在文本为 `民俗风物与文化传承` 的段落 | 裁决 4 | 不跳过空章节 |
@@ -718,7 +724,7 @@ const has = (xml, needle) => xml.includes(needle);
 | **S1** | 改 `src/lib/server/project-export.ts`：**自下而上**（`:288-425` 装配段 → `:149-238` → `:136-147` → `:125-134` → `:67-123` → `:35-65` → `:1-33` imports/常量），每段删完即 `npx tsc --noEmit` | `:516 → 约 330` 行；0 error |
 | **S2** | 改 `mock-llm-provider.ts`（§2.6 两处 + 常量区） | mock 五章；`tsc` 0 error |
 | **S3** | 改两处 UI 文案 + `visibleFormats`（§2.7，3 个 diff hunk） | `eslint` 0 problem |
-| **S4** | 新建 `tmp/verify-req25-export-format.mjs`（§3.1），**先跑一次期望全红／部分红**（此时 src 已改完，应全绿；若在 S1 之前跑则可作红基线） | 28 条断言输出 + exit code |
+| **S4** | 新建 `tmp/verify-req25-export-format.mjs`（§3.1），**先跑一次期望全红／部分红**（此时 src 已改完，应全绿；若在 S1 之前跑则可作红基线） | 28 条断言输出 + exit code（**BUG-13 后同一支探针为 31 条**，见顶部「后续」行） |
 | **S5** | 静态门 + 回归：`npx tsc --noEmit`、`npx eslint src`、`bug05`、`verify-req14-prompts` | 与 S0 对照，**只允许** `bug05` ③ 日志标题数 3→5 一处差异 |
 | **S6** | 变异自检 §3.4（临时改 → 验红 → 还原），至少跑 M1 / M4 / M5 / M6 四条 | 每次还原后 `git diff` 回到 S5 状态 |
 | **S7** | 收尾：`git status --porcelain`、`git diff --stat` | **恰 5 条**：4 生产文件 + 1 新探针；**不 commit、不 push** |
