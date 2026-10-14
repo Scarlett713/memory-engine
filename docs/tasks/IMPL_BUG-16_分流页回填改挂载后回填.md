@@ -6,7 +6,7 @@
 > - **规模**：生产代码 **1 文件 / 2 hunk**（`git diff --numstat` = `23 9`；hunk 首行 `@@ -1,6 +1,6 @@` 与 `@@ -48,24 +48,38 @@`）——① `:3` 的 `react` import；② `:45-82` 的 `basicInfo` 初值 ＋ 挂载后回填 effect（含 BUG-10 / BUG-16 注释块）。**「1 hunk」的缺口如实计入**：`useEffect` 必须新增 import，与改动区块相距 40 余行，git 必拆两段；把 effect 挪出本组件、或改用免 import 的形态，代价更大。
 > - **前置 / 红线**：`src/lib/**` **0 hunk**（不新增存储函数、不改 `outline-session.ts`）；`persistBasicInfo()`（BUG-07 守门）、`handleBack()`、`goToStep()`、header 文案 **0 hunk**；不动 `route-chooser.tsx` / `interview-console.tsx`；**范围口径不变** —— 仅 `initialStep === "route"`（BUG-10 §6-Q1 取 B）。
 > - **行号基线**：2026-10-14 实测，HEAD = `b2fb89c`（`master`，BUG-10 两笔 commit 之后；**本单已 commit（两笔）、未 push**）。行号口径 = `[IO.File]::ReadAllLines` ／ `Select-String`（**禁用 `Get-Content`** —— PS 5.1 会把无 BOM UTF-8 当 GBK 解码致行号虚高）。
-> - **状态**：**已完成**（2026-10-14 提交 · **本批第一笔** commit，hash 见第二笔回填）。终验：R1 `136/136` exit 0 ／ R2 `31/31` FAIL 0 exit 0 ／ R3 **45/46**（唯一 FAIL = 既有抖动臂 **J3**；K4 / K5 / K6 全 PASS）⇒ 依 §6-Q2 裁决视为通过；灵敏度反证已做并已原样恢复。
+> - **状态**：**已完成**（2026-10-14 提交 · **本批第一笔** commit `3da83da`，第二笔 `docs: 回填 BUG-16 首笔 commit hash`）。终验：R1 `136/136` exit 0 ／ R2 `31/31` FAIL 0 exit 0 ／ R3 **45/46**（唯一 FAIL = 既有抖动臂 **J3**；K4 / K5 / K6 全 PASS）⇒ 依 §6-Q2 裁决视为通过；灵敏度反证已做并已原样恢复。
 > - **回传口径（总管 2026-10-14 定）**：回传聊天窗口**只给三段** —— ① **结论表（commit hash / 行号 / 状态）**、② **待裁决项**、③ **异常（若有）**；**过程细节一律留在本单**（`numstat` / 编码与行尾核验 / 自伤修复经过 / 逐轮日志归属等），不进聊天窗口。
 
 ---
@@ -183,7 +183,7 @@ useEffect(() => {
 | ⑤ | `docs/tasks/IMPL_BUG-10_分流页返回信息丢失.md` | §1.2-③ 结论行标「**作废**」（附通道原因）；§2.3 落地段补「K5 / K6 ⇒ 46 条」；§6 增 **Q2-后续** 行（改判后置回填）；§4.2 末行补「该情形已实际发生」；文末补**批后追记** |
 | ⑥ | `docs/tasks/IMPL_BUG-16_分流页回填改挂载后回填.md` | 本单（S0 取证 → S4 反证 → 文档回写全过程） |
 | ⑦ | 其余既有文档（`IMPL_REQ-*` / `IMPL_UI-*` / `docs/系统现状与路线图.md`） | **不动**（与本案零交叉；路线图附表 1 属历史存档，沿用 v2.15 裁决） |
-| ⑧ | 本单 / `docs/需求登记表.md` | **commit hash 回填**：**第一笔** commit hash = `<HASH>`（随 §6-Q4 第二笔 `docs: 回填 BUG-16 首笔 commit hash` 落盘） |
+| ⑧ | 本单 / `docs/需求登记表.md` | **commit hash 回填**：**第一笔** commit hash = `3da83da`（已由 §6-Q4 第二笔 `docs: 回填 BUG-16 首笔 commit hash` 落地） |
 
 ---
 
