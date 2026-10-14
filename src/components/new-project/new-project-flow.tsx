@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
@@ -48,24 +48,38 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
   // EMPTY_BASIC_INFO ⇒ 分流页「AI 实时访谈」disabled、并冒出「请先回到上一步填写」。
   // 故只在分流步冷启动时从既有草稿读回一次（IMPL §6-Q1 取 B）：不扩大到 basic / outline，
   // 否则 ?step=outline 冷启动也会拿到初值，连带触发提纲步的 600ms 自动生成。
-  // 懒初始化只跑一次；typeof window 守门让 SSR 期恒为 EMPTY_BASIC_INFO（IMPL §6-Q2）。
-  const [basicInfo, setBasicInfo] = useState<BasicInfo>(() => {
-    if (initialStep !== "route" || typeof window === "undefined") {
-      return EMPTY_BASIC_INFO;
+  //
+  // BUG-16：读回**不得**发生在渲染期。本组件是 client component、仍参与 SSR，而 SSR 期
+  // 读草稿必为空 ⇒ 服务端渲出 `disabled=""` ＋ 空态提示，客户端首帧却读到草稿渲出可点且
+  // 无提示，两侧 HTML 不一致 ⇒ React 报 hydration 失败、丢弃服务端 HTML 整棵重渲染
+  // （实测原文：Hydration failed because the server rendered HTML didn't match the client.，
+  //   React 并直接点名 A server/client branch 「if (typeof window !== 'undefined')」这一形态。）
+  // 现改为：两态都用 EMPTY_BASIC_INFO 起手（SSR / 客户端首帧产物一致），草稿在挂载后的
+  // effect 里补进来（视觉上等价于「首帧空、随即回填」，不再有 mismatch）。
+  const [basicInfo, setBasicInfo] = useState<BasicInfo>(EMPTY_BASIC_INFO);
+
+  useEffect(() => {
+    // 与 BUG-10 同范围：只在分流步冷启动回填（IMPL §6-Q1 取 B，不扩大到 basic / outline）。
+    if (initialStep !== "route") {
+      return;
     }
 
     const profile = readOutlineDraftSession()?.profile;
 
     if (!profile) {
-      return EMPTY_BASIC_INFO;
+      return;
     }
 
-    return {
+    setBasicInfo({
       projectName: profile.projectName ?? "",
       intervieweeName: profile.intervieweeName ?? "",
       overview: profile.notes ?? "",
-    };
-  });
+    });
+    // 只在挂载时读回一次（与 BUG-10 懒初始化同语义）：initialStep 只是这一次性判定的输入，
+    // 后续 RSC 重渲染带来的 prop 变化不该触发第二次回填，否则分流步往返时会拿草稿去盖
+    // 用户刚在 state 里改的值。依赖数组故留空。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentIndex = NEW_PROJECT_STEPS.findIndex((item) => item.key === step);
 

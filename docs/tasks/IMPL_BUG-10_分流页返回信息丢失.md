@@ -151,7 +151,7 @@ const EMPTY_BASIC_INFO: BasicInfo = {
 | ① | 提纲步自动生成（软导航臂：分流步 → header 返回 → 提纲步） | 自动生成信号 = `generating`（**原码对照 = 「6s 内无」**） | **行为确有变化、已如实记录**：该路径 `markdown` 初值恒 `""`（`outline-plan-workspace.tsx:123`）、自动生成只 `setMarkdown` **不写 `sessionStorage`** ⇒ 既有草稿不被覆盖；**H3（现 label「R2 返回 3/3」，`tmp/verify-phase3.mjs:541`）仍 PASS**（其断言只比 `profile` 三字段）⇒ 与上表预期一致 |
 | ①′ | **冷启动臂（Q1=B 的直接效果，实施轮追加）** | 有草稿硬加载 `?step=outline` ⇒ 自动生成信号 = 「6s 内无」、`#outline-topic=""` | ✅ 范围收窄生效：提纲步**冷启动不**回填、**不**触发自动生成 |
 | ② | 冷启动「初值为空」类断言（A2，`:153-156`） | `A2 旧路由冷启动` **PASS**（R3 整单 44/44 两轮） | ✅ A2 **零改动**（既有 39 条逐字未动）⇒ 未出现「§0 论证有误」信号 |
-| ③ | Hydration | 有草稿直开 `?step=route`：console 条目 2 ／ hydration 相关 **0**；`#route-chooser-realtime` 最终 `disabled=false` | ✅ **无 hydration 告警** ⇒ **Q2 懒初始化形态可**（无需转后置 `useEffect` 回填） |
+| ③ | Hydration | 有草稿直开 `?step=route`：console 条目 2 ／ hydration 相关 **0**；`#route-chooser-realtime` 最终 `disabled=false` | ✅ **无 hydration 告警** ⇒ **Q2 懒初始化形态可**（无需转后置 `useEffect` 回填）。**⚠ 本行结论已于 2026-10-14 作废（BUG-16）**：该读数出自**通道盲区** —— React 19 ＋ Next 16 的 hydration 失败经 `reportError` 抛出、走 CDP 的 `Runtime.exceptionThrown`，而当轮该臂**只采 `Runtime.consoleAPICalled`**。双通道复测（对照臂 ＝ 无草稿）：有草稿硬加载 `?step=route` ⇒ **异常 1 条**（原文点名 `A server/client branch 「if (typeof window !== 'undefined')」`）＋ 结构比对两侧不一致；对照臂 0 条 ⇒ 「Q2 懒初始化形态可」**不成立**，该形态已由 BUG-16 改为「`useState(EMPTY_BASIC_INFO)` ＋ 挂载后 `useEffect` 回填」（**Q1=B 的范围口径与 K1 能力均不变**）。详见 `docs/tasks/IMPL_BUG-16_分流页回填改挂载后回填.md` |
 
 ---
 
@@ -187,7 +187,7 @@ const EMPTY_BASIC_INFO: BasicInfo = {
 
 优先**扩展** `tmp/verify-phase3.mjs` 的 H 段（该段即「返回导航」面的既有归属：H1 / H2 / H3 已锁三条返回落点，H6 / H7 已锁 outline-required 弹窗），新增 **1 组（V1 ~ V4 ＋ V6 反证）**；**不另立新探针文件**（避免第二份文档事实源）。V5 若与 H 段既有导航序列冲突，可降级为人工验收项并在 §5 记录。
 
-**落地（2026-10-14）**：已在 H 段之后新增 **K 组 5 条** —— `K1`（V1 ＋ V2 ＋ 草稿在场）、`K2`（V3）、`K3`（V4，提纲步三字段）、`K3b`（V4 直读形态，按 §2.2 说明段允许项直读 `#projectName` / `#intervieweeName` / `#overview`）、`K4`（V6 反证），落点 `tmp/verify-phase3.mjs:1066` / `:1075` / `:1112` / `:1144` / `:1199`（`check(` 行，2026-10-14 实测；追加后行号会位移，**引用按 label 定位**）；`tmp/verify-phase3.mjs` 实测总数 **39 → 44 条**（**K 组之外 39 条逐字零改动**）。**V5（Q3）降级人工项**：探针内只留 `§6-Q3 V5（同 tab 硬刷新，人工项）机器快照` 的 NOTE，**不入 `check`**。**导航守卫硬化**：新增助手 `clickBackUntil`，其判定基准由 `location.search` 改为渲染锚点 `#new-step-*`（根因：`goToStep` 的 `setStep` 是紧急更新、`router.replace` 是过渡更新，过渡未提交时 **URL 旧 / DOM 新** ⇒ 用 URL 当守卫会重复点击、多退一格）。**计数口径更正**：S0 表所写「`verify-phase3 24/24`」为探针**早期版本**口径（此后已被 REQ-24 / R7 / 问题 A-B 等单扩展至 39），本单按落地后的 **44** 记。
+**落地（2026-10-14）**：已在 H 段之后新增 **K 组 5 条** —— `K1`（V1 ＋ V2 ＋ 草稿在场）、`K2`（V3）、`K3`（V4，提纲步三字段）、`K3b`（V4 直读形态，按 §2.2 说明段允许项直读 `#projectName` / `#intervieweeName` / `#overview`）、`K4`（V6 反证），落点 `tmp/verify-phase3.mjs:1066` / `:1075` / `:1112` / `:1144` / `:1199`（`check(` 行，2026-10-14 实测；追加后行号会位移，**引用按 label 定位**）；`tmp/verify-phase3.mjs` 实测总数 **39 → 44 条**（**K 组之外 39 条逐字零改动**）。**V5（Q3）降级人工项**：探针内只留 `§6-Q3 V5（同 tab 硬刷新，人工项）机器快照` 的 NOTE，**不入 `check`**。**导航守卫硬化**：新增助手 `clickBackUntil`，其判定基准由 `location.search` 改为渲染锚点 `#new-step-*`（根因：`goToStep` 的 `setStep` 是紧急更新、`router.replace` 是过渡更新，过渡未提交时 **URL 旧 / DOM 新** ⇒ 用 URL 当守卫会重复点击、多退一格）。**计数口径更正**：S0 表所写「`verify-phase3 24/24`」为探针**早期版本**口径（此后已被 REQ-24 / R7 / 问题 A-B 等单扩展至 39），本单按落地后的 **44** 记。**后续（2026-10-14，BUG-16）**：同段尾部再追加 **K5 / K6 两臂**（`exceptionThrown` 通道 ＋ 「SSR 节点标记」的结构判据），探针总数 **44 → 46 条**、K 组 **5 → 7 条**；**K1~K4 与 K 组之外 39 条逐字零改动**，本单 §2.2 的判据口径未变。
 
 ---
 
@@ -229,7 +229,7 @@ const EMPTY_BASIC_INFO: BasicInfo = {
 | S1 后任一回归项变红 | `git checkout -- src/components/new-project/new-project-flow.tsx`（**单文件单点**，回滚即恢复 `useState<BasicInfo>(EMPTY_BASIC_INFO)` 原状），然后回总管对话 |
 | 探针已追加后回滚 | 探针改动与实现**同批回退**（`git checkout -- tmp/verify-phase3.mjs`）；**不得**留「断言在、实现无」的中间态 |
 | 文档已回写后回滚 | 登记表 / 本单同批回退，恢复登记表原状态「**待实施**（代码侧根因待定性）」 |
-| §1.2-③ hydration 告警不可接受 | 本单方案作废，转 §6-Q2 由总管重新裁决形态 |
+| §1.2-③ hydration 告警不可接受 | 本单方案作废，转 §6-Q2 由总管重新裁决形态。**该情形已于 2026-10-14 实际发生**：双通道复测证实存在 hydration 失败 ⇒ 懒初始化**形态**作废（本单 §1.1 写法被 BUG-16 替换）；但回滚范围**仅限该形态** —— K 组能力断言（K1~K4）与 Q1=B 的范围口径**全部保留**，本单其余交付**未回退**。后续单：`docs/tasks/IMPL_BUG-16_分流页回填改挂载后回填.md` |
 
 > 回滚粒度 = **1 文件 1 hunk**，不存在跨文件级联 —— 这也是本单把存储扩展（`src/lib/**`）排除在外的直接原因。
 
@@ -263,6 +263,11 @@ const EMPTY_BASIC_INFO: BasicInfo = {
 | --- | --- | --- | --- |
 | **Q1** | 回填范围 vs 提纲步自动生成 | **取 B** —— 仅 `initialStep === "route"` 回填（同 hunk 内加 `typeof window !== "undefined"` 守门） | 代码 `new-project-flow.tsx:53`；提纲步**冷启动**臂实测无自动生成（§1.2-①′）；软导航臂的生成行为变化已如实记入 §1.2-① |
 | **Q2** | Hydration 形态 | **保持懒初始化**（不转后置 `useEffect` 回填） | 有草稿直开 `?step=route` 实测 **无 hydration 告警**、按钮最终可点（§1.2-③） |
+| **Q2-后续** | （2026-10-14 · BUG-16 跟进）形态改判 | **改判为「后置回填」** —— `useState(EMPTY_BASIC_INFO)` ＋ 挂载后 `useEffect` 回填 | 上一格「无 hydration 告警」经双通道复测**作废**（通道盲区：只采 `consoleAPICalled`、漏了 `exceptionThrown`）⇒ 总管 2026-10-14 诊断单已立 **BUG-16** 并指定后置回填；本单 §1.1 的懒初始化写法随之修订（`new-project-flow.tsx` 由 **1 hunk → 2 hunk**，`git diff --numstat` = `23 9`），**Q1 取 B 的范围口径与 K1 能力不变** |
 | **Q3** | V5 是否纳入机器断言 | **不纳入**，降级人工验收项 | 探针内只留机器快照 NOTE；人工项 ＝ 同 tab 硬刷新 `?step=route` 后按钮 `disabled=false`（机器快照已吻合，待实机复认） |
 
 > 本单最终改动面 ＝ **`src` 1 文件 / 1 hunk**（`new-project-flow.tsx:46-68`，懒初始化 ＋ 注释块）＋ **`tmp/verify-phase3.mjs` 追加**（K 组 5 条；**`tmp/` 已由 `.gitignore:54` 忽略 ⇒ 不入版本库**）＋ `docs/需求登记表.md` 四处与任务单回写；§6 三项裁决结论见上表，落地结果见 §5 回写与变更记录 **v2.20**。
+
+---
+
+> **批后追记（2026-10-14，BUG-16）**：本单 §1.2-③ 的「无 hydration 告警」结论已被证伪（`Runtime.exceptionThrown` 通道漏采）、§6-Q2 的形态裁决改判为「后置回填」，两项均由 **BUG-16** 承接落地（`src` ⇒ **2 hunk** / `numstat 23 9`；探针 ⇒ **46 条**）。本单的**范围口径（Q1 取 B）与能力断言（K1~K4）零变更**；上表 Q2 行、§1.2-③ 行与 §4.2 末行已**就地加注**，原文一律保留以便审计。后续单：`docs/tasks/IMPL_BUG-16_分流页回填改挂载后回填.md`；登记表侧见 **v2.21** 变更记录。
