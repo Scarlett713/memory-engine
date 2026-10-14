@@ -4,6 +4,9 @@
 //   07_口述史写作模板.docx      → OUTLINE_WRITING_TEMPLATES（5 类模板的章节骨架，逐字照抄）
 //   05_最终交付文本标准...docx  → WRITING_RULES_TEMPLATE 的【内容标准】节（五项内容标准）
 //   03_AI语言输出规范.docx      → WRITING_RULES_TEMPLATE 的【语言规范】节（四大原则 + 修正边界）
+//   REQ-31                      → OUTLINE_WRITING_TEMPLATES 新增第 6 套「通用访谈类」（3 章默认
+//                                 骨架、不沿用五章结构）；仅经 WritingTemplateInput.templateKey
+//                                 显式键可达，不进 SCENARIO_WRITING_TEMPLATE / CUSTOM_TEMPLATE_KEYWORDS。
 //
 // 纯常量 + 纯函数：无 IO、无副作用，可被 route / server / 验收脚本直接引用。
 // 模板字面量一律顶格书写 —— 缩进会成为注入到 prompt 里的正文。
@@ -21,7 +24,8 @@ export type WritingTemplateKey =
   | "local_chronicle"
   | "enterprise_history"
   | "biography"
-  | "family_memoir";
+  | "family_memoir"
+  | "general";
 
 export type WritingTemplate = {
   key: WritingTemplateKey;
@@ -89,6 +93,17 @@ export const OUTLINE_WRITING_TEMPLATES: Record<
       "五、家族记忆与情感寄语",
     ],
   },
+  // REQ-31：第 6 套「通用访谈类」（非口述史 / 非史志类访谈）。默认骨架刻意取 3 章、
+  // 不沿用五章结构；章标题仍带「中文数字、」序号 —— 导出侧按该序号识别章标题（REQ-25）。
+  general: {
+    key: "general",
+    name: "通用访谈类",
+    chapters: [
+      "一、背景与缘起",
+      "二、主要经历与关键事实",
+      "三、认识、评价与展望",
+    ],
+  },
 };
 
 // 兜底模板：07 的「人物传记类」骨架最通用（生平 → 节点 → 成就 → 人际 → 感悟）。
@@ -124,6 +139,9 @@ export type WritingTemplateInput = {
   customScenarioLabel?: string;
   projectName?: string;
   researchFocus?: string;
+  // REQ-31：显式指定模板（优先级高于场景映射与关键词兜底）。
+  // 缺省 / 非法值时不进入该分支，既有两条解析分支逐字不变（REQ-14 第 1 组守门）。
+  templateKey?: WritingTemplateKey;
 };
 
 export function matchCustomTemplateKey(
@@ -142,6 +160,16 @@ export function matchCustomTemplateKey(
 export function resolveWritingTemplate(
   input: WritingTemplateInput,
 ): WritingTemplate {
+  // REQ-31：显式键通道 —— 新模板的唯一接入口；不改场景映射与关键词兜底。
+  // 声明为可缺省类型：运行时传入非法键时同样回落既有链路，不抛错。
+  const explicit: WritingTemplate | undefined = input.templateKey
+    ? OUTLINE_WRITING_TEMPLATES[input.templateKey]
+    : undefined;
+
+  if (explicit) {
+    return explicit;
+  }
+
   if (input.scenario === "custom") {
     return OUTLINE_WRITING_TEMPLATES[matchCustomTemplateKey(input)];
   }

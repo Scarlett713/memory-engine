@@ -5,7 +5,7 @@
 > - **前置**：实施序第 3 位（REQ-25 已验收 2026-10-13 → BUG-13 已闭环 `d080ca3` → **本条**）。**本单出稿后须总管裁决方可开工**（REQ-14 探针锁定面）。
 > - **行号基线**：2026-10-13 实测，HEAD = `42229f4`（`master`，工作区 clean）；改前须按 §0.2-② 复核。
 > - **红线**：不动既有 5 套模板章节字面 / 不动场景映射与关键词兜底 / 不动 mock（§0.1 三条约束）。
-> - **状态**：**待总管裁决 · 待实施**（本单出稿轮 `src` / `tmp` / `storage` 零改动）。
+> - **状态**：**已完成（2026-10-13，`commit`）**（实施轮同批落盘：生产 `src/lib/writing-rules.ts` **1 文件 / 5 hunk** ＋ 探针 `tmp/verify/verify-req14-prompts.ts` **1 文件 / 5 处** ＋ 本单回写；验收 **V1 136 / 136 · exit 0**、**R2 31 / 31 不回退**）。
 
 ---
 
@@ -332,7 +332,7 @@ checkTrue("2b.守门", "mock 未接显式键（源码级）", !mockSource.includ
 | 12 | `2b.显式键` · 非法键回落既有链路 | `resolveWritingTemplate({ scenario: "urban_memory", templateKey: "nope" as never }).name` | `"地方史志类"` | 非法键抛错 / 误落 `FALLBACK`（`:150` 既有分支被绕过） |
 | 13 | `2b.通用模板` · 模板名注入 | `generalRules.includes("本项目适用模板：通用访谈类。")` | `true` | `renderTemplate` 值映射漏填 `TEMPLATE_NAME`（与 `:342` 同形） |
 | 14 | `2b.通用模板` · 3 条章标题全部注入 | `chapters.every((c) => generalRules.includes(c))` | `true` | `TEMPLATE_CHAPTERS` 未 join 新骨架（与 `:343-347` 同形） |
-| 15 | `2b.通用模板` · Prompt B ≤ 2400 字符 | `generalRules.length` | `<= 2400`（实测值打印后回填本行） | 章标题过长（既有 5 类实测 1296 / 1305 / 1310 / 1302 / 1307） |
+| 15 | `2b.通用模板` · Prompt B ≤ 2400 字符 | `generalRules.length` | `<= 2400`（**实测 2026-10-13 = 1277 字符**，已回填本行） | 章标题过长（既有 5 类实测 1296 / 1305 / 1310 / 1302 / 1307） |
 | 16 | `2b.通用模板` · Prompt B 无 `{{}}` 残留 | `!generalRules.includes("{{")` | `true` | 新增占位符未在 `buildWritingRules` 填充（与 `:284` 同形） |
 | 17 | `2b.通用模板` · 章节插槽保留（规则正文未改） | `WRITING_RULES_TEMPLATE.includes("\n{{TEMPLATE_CHAPTERS}}\n")` | `true` | 顺手改 `:184-186` 的规则正文（约束 ①） |
 | 18 | `2b.守门` · 场景映射未接入 general | `(Object.values(SCENARIO_WRITING_TEMPLATE) as string[]).includes("general")` | `false` | 把新键写进 `SCENARIO_WRITING_TEMPLATE`（约束 ②） |
@@ -343,8 +343,8 @@ checkTrue("2b.守门", "mock 未接显式键（源码级）", !mockSource.includ
 
 | 文件 | hunk | 行数变化 | 说明 |
 | --- | --- | --- | --- |
-| `src/lib/writing-rules.ts` | 5 | **+28 / −0**（224 → 252 行） | 生产代码唯一改动文件 |
-| `tmp/verify/verify-req14-prompts.ts` | 5（`:182` 改写 / import / `renderCase` / 头注释 / 末尾区块） | ≈ **+100 / −1**（521 → ≈ 621 行） | 断言 **116 → 136** |
+| `src/lib/writing-rules.ts` | 5 | **+29 / −1**（**净 +28**；224 → 252 行；**实测 `git diff --stat`**） | 生产代码唯一改动文件（唯一一行替换 = `WritingTemplateKey` 联合类型末行加 `| "general"`） |
+| `tmp/verify/verify-req14-prompts.ts` | 5（`:182` 改写 / import / `renderCase` / 头注释 / 末尾区块） | **+102 / −1**（521 → **623 行**；**实测 `[IO.File]::ReadAllLines`**） | 断言 **116 → 136**（`2b` 组 20 条经字面计数实测：13 / 4 / 3） |
 | `src/lib/providers/llm/mock-llm-provider.ts` | **0** | 0 | 约束 ③；`git diff` 必须为空 |
 | `src/lib/server/project-export.ts`、`src/lib/interview-prompt.ts`、`src/lib/oral-history.ts`、`src/lib/types/project.ts`、`src/lib/server/project-store.ts`、`src/app/api/**`、`src/components/**`、`storage/**`、`.next*` | **0** | 0 | §0.3-⑧⑨⑫ / §0.4 |
 
@@ -373,6 +373,7 @@ checkTrue("2b.守门", "mock 未接显式键（源码级）", !mockSource.includ
 
 - 既有 **116** 条构成不变：**115 条逐字零改动** ＋ `:182` **1 条表达式等价改写**（改前改后均 PASS，见 §1.2-①）。
 - 组 2 ~ 组 7 的断言**条数**与**期望值**全部不变；新增只发生在 `2b` 组。
+- **实测收口（2026-10-13 实施轮）**：**V1 = 136 / 136 通过 · FAIL 0 · exit 0**；V2 `tsc --noEmit` **0 error**；V3 `eslint src` **存量 6 项（1 error ＋ 5 warning）不变**（`eslint src/lib/writing-rules.ts` 单测 **0 problem / exit 0**）；V5 改动面 = 生产 **1 文件**（5 hunk）＋ 探针 **1 文件**，mock / `project-export.ts` diff **均空**；**V6 红灯先行留证** = 生产未改时 `2b.通用模板 · general 键存在` **FAIL ＋ TypeError / exit 1**；R2 = **31 / 31 PASS · FAIL 0 · exit 0**；R3 = bug05 **基线 6 FAIL 不变**；R8（非硬验收）未跑实件冒烟 —— mock 链路仍为 5 章已由 `2b` 第 20 条（源码级）＋ mock **0 hunk** 双重坐实。
 
 ### 2.2 验收矩阵
 
@@ -381,7 +382,7 @@ checkTrue("2b.守门", "mock 未接显式键（源码级）", !mockSource.includ
 | **V1** | REQ-14 探针（**主件**） | `node --experimental-strip-types --import ./tmp/register-alias.mjs tmp/verify/verify-req14-prompts.ts`（**仓库根目录**执行） | 末行打印 `REQ-14 prompt 验收：136/136 通过`、**FAIL 0**、**exit 0** |
 | **V2** | TypeScript | `npx tsc --noEmit` | **0 error**（含探针 `renderCase` 的 `Record<WritingTemplateKey, …>` 已补 `general` 键；禁以 `@ts-expect-error` / 新增 `any` 掩盖类型缺口） |
 | **V3** | ESLint | `npx eslint src`（全仓口径：`npm run lint`） | **不新增**告警 / 错误（改前先跑一次记基线） |
-| V4 | 输出字符数留痕 | V1 同批输出 | 打印 `[4.体积] Prompt B（…）` 既有 5 行数值 **1296 / 1305 / 1310 / 1302 / 1307 不变**；`2b` 第 15 条的 `generalRules.length` 实测值回填本单 §1.2-⑥ 第 15 行 |
+| V4 | 输出字符数留痕 | V1 同批输出 | 打印 `[4.体积] Prompt B（…）` 既有 5 行数值 **1296 / 1305 / 1310 / 1302 / 1307 不变**；`2b` 第 15 条的 `generalRules.length` 实测值回填本单 §1.2-⑥ 第 15 行 —— **实测（2026-10-13）**：既有 5 行 **1296 / 1305 / 1310 / 1302 / 1307 逐值不变**；`generalRules.length` = **1277 字符**（≤ 2400，已回填 §1.2-⑥ 第 15 行）；Prompt A 骨架 **1232** / Prompt A 全量 **3722** 不变 |
 | V5 | 改动面 | `git diff --stat` ＋ `git diff src/lib/providers/llm/mock-llm-provider.ts` | 恰 **2 个文件**（`writing-rules.ts` ＋ 探针）；mock diff **为空** |
 | V6 | 红灯先行（**建议留证**） | 先落 `2b` 组、后落生产改动，分两次跑 V1 | 第一次：`2b` 组多数 FAIL（证明缺口真实存在）；第二次：136/136 ⇒ 证据链完整（不强制作硬验收） |
 
@@ -469,5 +470,5 @@ checkTrue("2b.守门", "mock 未接显式键（源码级）", !mockSource.includ
 
 ---
 
-> **出单信息**：`docs/tasks/IMPL_REQ-31_通用模板.md`｜2026-10-13 出稿｜基线 HEAD `42229f4`（`master`，工作区 clean）｜上游 = `docs/需求登记表.md` §三 REQ-31（P2）＋ §5.2 `:1207`（锁定面条目）｜本单**待总管裁决后开工**。
+> **出单信息**：`docs/tasks/IMPL_REQ-31_通用模板.md`｜2026-10-13 出稿｜基线 HEAD `42229f4`（`master`，工作区 clean）｜上游 = `docs/需求登记表.md` §三 REQ-31（P2）＋ §5.2 `:1207`（锁定面条目）｜实施轮基线 HEAD = `408b6af`（`master`，工作区 clean）｜本单**已完成（2026-10-13，`commit`；生产 ＋ 探针 ＋ 文档同批）**。
 
