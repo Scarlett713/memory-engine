@@ -43,8 +43,29 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
     normalizeStep(initialStep),
   );
   // 基本信息只走 React state，不下沉 sessionStorage（IMPL §3.4）。
-  // 刷新即丢，草稿回填归 REQ-15。
-  const [basicInfo, setBasicInfo] = useState<BasicInfo>(EMPTY_BASIC_INFO);
+  // BUG-10：访谈页「返回上一步」是跨路由 <Link> → /projects/new?step=route
+  // （interview-console.tsx:975-982），NewProjectFlow 会整棵重挂载；不读回就退回
+  // EMPTY_BASIC_INFO ⇒ 分流页「AI 实时访谈」disabled、并冒出「请先回到上一步填写」。
+  // 故只在分流步冷启动时从既有草稿读回一次（IMPL §6-Q1 取 B）：不扩大到 basic / outline，
+  // 否则 ?step=outline 冷启动也会拿到初值，连带触发提纲步的 600ms 自动生成。
+  // 懒初始化只跑一次；typeof window 守门让 SSR 期恒为 EMPTY_BASIC_INFO（IMPL §6-Q2）。
+  const [basicInfo, setBasicInfo] = useState<BasicInfo>(() => {
+    if (initialStep !== "route" || typeof window === "undefined") {
+      return EMPTY_BASIC_INFO;
+    }
+
+    const profile = readOutlineDraftSession()?.profile;
+
+    if (!profile) {
+      return EMPTY_BASIC_INFO;
+    }
+
+    return {
+      projectName: profile.projectName ?? "",
+      intervieweeName: profile.intervieweeName ?? "",
+      overview: profile.notes ?? "",
+    };
+  });
 
   const currentIndex = NEW_PROJECT_STEPS.findIndex((item) => item.key === step);
 
