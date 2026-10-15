@@ -12,7 +12,10 @@ import {
   isProjectOwnedBy,
   listProjects,
 } from "@/lib/server/project-store";
-import { saveInterviewAudio } from "@/lib/server/upload-store";
+import {
+  saveInterviewAudio,
+  type SavedInterviewAudio,
+} from "@/lib/server/upload-store";
 import type { RedactionRule, UserType } from "@/lib/types/project";
 
 // 与 /api/outline/generate、/api/projects/ai-interview 保持同口径的 notes 上限。
@@ -156,7 +159,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const savedAudio = await saveInterviewAudio(audio);
+    let savedAudio: SavedInterviewAudio;
+
+    try {
+      savedAudio = await saveInterviewAudio(audio);
+    } catch (error) {
+      // 这里的 throw 全是入参校验（空文件 / 超 100MB / 非音频格式）：原话直出回 400，
+      // 与 audio 路由 :86-101 同形同码。已知取舍同其注释：writeFile 失败也会落到这里
+      // （区分它须改 upload-store.ts，而那是 BUG-11 铁律不动的文件）。
+      return NextResponse.json(
+        {
+          message:
+            error instanceof Error
+              ? error.message
+              : "音频文件校验未通过，请重新选择。",
+        },
+        { status: 400 },
+      );
+    }
+
     const project = await createProject({
       audioFileName: savedAudio.fileName,
       audioMimeType: savedAudio.mimeType,
@@ -186,10 +207,12 @@ export async function POST(request: Request) {
       },
       { status: 201 },
     );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "上传失败，请稍后重试。";
-
-    return NextResponse.json({ message }, { status: 500 });
+  } catch {
+    // 不回显内部 error.message：写盘 / 存储层异常串可能含绝对路径与系统错误码
+    // （EACCES / ENOSPC 等）。形状对齐 [projectId]/interview/audio/route.ts:122-127。
+    return NextResponse.json(
+      { message: "上传失败，请稍后重试。" },
+      { status: 500 },
+    );
   }
 }

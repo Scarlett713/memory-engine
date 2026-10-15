@@ -40,10 +40,13 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({
       project: processed,
     });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "处理失败，请稍后重试。";
-
-    return NextResponse.json({ message }, { status: 500 });
+  } catch {
+    // 不回显内部 error.message：转写 / LLM / 写盘异常原话含配置名与实现细节。
+    // 已知：可读的 provider 文案（如「讯飞转写任务失败（failType=…）。」）本层会被覆盖，
+    // 该串仍留在流程内的 lastProcessingError（process-project.ts:216，本批不动）—— §6-Q1 / Q2。
+    return NextResponse.json(
+      { message: "处理失败，请稍后重试。" },
+      { status: 500 },
+    );
   }
 }

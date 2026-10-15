@@ -35,7 +35,17 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const body = (await request.json()) as { question?: unknown };
+    let body: { question?: unknown };
+
+    try {
+      body = (await request.json()) as { question?: unknown };
+    } catch {
+      return NextResponse.json(
+        { message: "请求格式不正确。" },
+        { status: 400 },
+      );
+    }
+
     const question =
       typeof body.question === "string" ? body.question.trim() : "";
 
@@ -72,10 +82,12 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({
       answer: result.answer,
     });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "问答失败，请稍后重试。";
-
-    return NextResponse.json({ message }, { status: 500 });
+  } catch {
+    // 不回显内部 error.message：provider 异常原话含端点与环境变量名（如
+    // ark-llm-provider.ts:26 / :302）。形状对齐 audio 路由 :122-127。
+    return NextResponse.json(
+      { message: "问答失败，请稍后重试。" },
+      { status: 500 },
+    );
   }
 }
