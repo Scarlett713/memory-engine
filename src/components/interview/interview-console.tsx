@@ -250,6 +250,21 @@ const BLOB_WAIT_TIMEOUT_MS = 2000;
 const BLOB_POLL_INTERVAL_MS = 50;
 
 /**
+ * BUG-09：提问链路的客户端上限。链路「已断、不回包」时服务端那 15s race 不生效
+ * （包根本回不来），加载态必须由客户端自己兜一个上限。
+ *
+ * 必须 > 服务端的 INTERVIEW_QUESTION_TIMEOUT_MS（15s）：否则服务端自己的 502
+ * 信封会先被我们 abort 掉，服务端口径反而看不到。5s 余量留给回程与解析。
+ */
+const NEXT_QUESTION_TIMEOUT_MS = 20_000;
+/**
+ * 与服务端 502 信封（next-question/route.ts:179 / :193）逐字一致，用户视角连续。
+ * 2026-10-15 裁决：本常量初稿带句号、服务端不带（同一现象两个来源、两种文案），
+ * 按「服务端为单一真值来源」去句号对齐。
+ */
+const NEXT_QUESTION_TIMEOUT_MESSAGE = "AI 响应超时，请重试";
+
+/**
  * Step 3：真实解析器落在 interview-outline-checklist.tsx（PRD §3 模块 7）。
  * 这里只做「去 Markdown 前缀取非空行」的粗解析，供摘要与逐题推进占位使用。
  */
@@ -798,6 +813,12 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
 
   // 每问一次真实请求。首问（START）与后续每一问都走这里。
   const fetchNextQuestion = useCallback(async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(
+      () => controller.abort(),
+      NEXT_QUESTION_TIMEOUT_MS,
+    );
+
     try {
       const res = await fetch(
         `/api/projects/${project.id}/interview/next-question`,
@@ -810,6 +831,7 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
             coveredItemIds: state.coveredItemIds,
             lastAnswer: state.captions,
           }),
+          signal: controller.signal,
         },
       );
 
@@ -848,10 +870,22 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
         coveredItemIds: data.coveredItemIds ?? [],
       });
     } catch (error) {
+      // AbortError 的 message 是浏览器英文串（如 "signal is aborted without
+      // reason"），属实现细节、不外显（同 BUG-12 的脱敏纪律）⇒ 固定人话。
+      const timedOut =
+        error instanceof DOMException && error.name === "AbortError";
+
       dispatch({
         type: "FAIL",
-        message: error instanceof Error ? error.message : "网络错误，请重试",
+        message: timedOut
+          ? NEXT_QUESTION_TIMEOUT_MESSAGE
+          : error instanceof Error
+            ? error.message
+            : "网络错误，请重试",
       });
+    } finally {
+      // 快路径也要清：挂着的 timer 会拖住下一次渲染轮（对照 route.ts:66-69）。
+      window.clearTimeout(timer);
     }
   }, [
     project.id,
