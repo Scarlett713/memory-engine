@@ -254,9 +254,12 @@ const BLOB_POLL_INTERVAL_MS = 50;
  * （包根本回不来），加载态必须由客户端自己兜一个上限。
  *
  * 必须 > 服务端的 INTERVIEW_QUESTION_TIMEOUT_MS（15s）：否则服务端自己的 502
- * 信封会先被我们 abort 掉，服务端口径反而看不到。5s 余量留给回程与解析。
+ * 信封会先被我们 abort 掉，服务端口径反而看不到。15s 余量留给回程与解析。
+ *
+ * 2026-10-20：20s → 30s。DeepSeek 冷启动（首问建连 + 长 prompt 的 TTFT）会吃掉
+ * 20s 窗口，用户看到的是一次无谓的「超时」。30s = 服务端 15s 的 2 倍，不变量不变。
  */
-const NEXT_QUESTION_TIMEOUT_MS = 20_000;
+const NEXT_QUESTION_TIMEOUT_MS = 30_000;
 /**
  * 与服务端 502 信封（next-question/route.ts:179 / :193）逐字一致，用户视角连续。
  * 2026-10-15 裁决：本常量初稿带句号、服务端不带（同一现象两个来源、两种文案），
