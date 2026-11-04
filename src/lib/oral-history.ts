@@ -353,9 +353,9 @@ export function createFallbackTimeline(summary: string): TimelineEvent[] {
   return [
     {
       id: "timeline-1",
-      timeLabel: "待人工补充",
+      timeLabel: "时间不详",
       title: "口述历史关键事件",
-      description: summary.trim(),
+      description: summary.trim().slice(0, 25),
     },
   ];
 }

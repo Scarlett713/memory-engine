@@ -11,11 +11,11 @@ const TIMELINE_COLLAPSE_THRESHOLD = 8;
 // 折叠时显示的条数
 const TIMELINE_VISIBLE_COUNT = 6;
 
-// 「时间待补充」的两种既有写法。需求原文是「时间待补充」，
-// 但 createFallbackTimeline（oral-history.ts）实际写的是「待人工补充」——
-// 短转写稿走兜底路径是最常见的情况，只认前者会让这批节点显示成实心节点 + 实线徽标，
-// 看上去像「时间已知」。两个都收进来，不改数据层。
-const PENDING_TIME_LABELS = new Set(["待人工补充", "时间待补充"]);
+// 「时间待补充」的三种写法：存量两值（"待人工补充" / "时间待补充"）＋ 新增兜底值（"时间不详"）。
+// 需求原文是「时间待补充」，但 createFallbackTimeline（oral-history.ts）存量数据写的是「待人工补充」，
+// REQ-35 起新兜底统一写「时间不详」——短转写稿走兜底路径是最常见的情况，只认前者会让这批节点
+// 显示成实心节点 + 实线徽标，看上去像「时间已知」。三种都收进来，不改数据层。
+const PENDING_TIME_LABELS = new Set(["待人工补充", "时间待补充", "时间不详"]);
 
 function isPendingTimeLabel(label: string) {
   const trimmed = label.trim();
