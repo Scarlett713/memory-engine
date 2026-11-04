@@ -16,10 +16,12 @@ import {
 } from "@/lib/outline-session";
 
 // 步骤 key 同时是 URL 的 step 值与 #new-step-* 锚点后缀（IMPL §3.3）。
+// REQ-36：提纲是 AI 分访谈的准备工作，先让用户选采集方式（AI / 上传），
+// 上传路径因此可整段跳过提纲步。
 const NEW_PROJECT_STEPS = [
   { key: "basic", label: "基本信息" },
-  { key: "outline", label: "提纲" },
   { key: "route", label: "选择方式" },
+  { key: "outline", label: "提纲" },
 ] as const;
 
 type NewProjectStep = (typeof NEW_PROJECT_STEPS)[number]["key"];
@@ -57,24 +59,36 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
   // 现改为：两态都用 EMPTY_BASIC_INFO 起手（SSR / 客户端首帧产物一致），草稿在挂载后的
   // effect 里补进来（视觉上等价于「首帧空、随即回填」，不再有 mismatch）。
   const [basicInfo, setBasicInfo] = useState<BasicInfo>(EMPTY_BASIC_INFO);
+  // REQ-36 Q2：提纲种子。值只在「点 AI 实时访谈」这一下从草稿读一次，
+  // 再作为 OutlinePlanWorkspace 的首帧初值下传（workspace 的 markdown 是 useState，
+  // prop 只在首帧被消费，渲染期或 effect 后补都拿不到）。
+  const [outlineSeed, setOutlineSeed] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [outlineError, setOutlineError] = useState("");
 
   useEffect(() => {
-    // 与 BUG-10 同范围：只在分流步冷启动回填（IMPL §6-Q1 取 B，不扩大到 basic / outline）。
-    if (initialStep !== "route") {
+    // 与 BUG-10 同范围：只在分流步冷启动回填（IMPL §6-Q1 取 B，不扩大到 basic）。
+    // REQ-36 Q4：?step=outline 冷启动（刷新 / 直入 / 老书签 307 跳板）没有「已选 AI」
+    // 这一前提，outline 已是 AI 分支的终局步 ⇒ 回填 basicInfo 后直接回 route 重选。
+    if (initialStep !== "route" && initialStep !== "outline") {
       return;
     }
 
     const profile = readOutlineDraftSession()?.profile;
 
-    if (!profile) {
-      return;
+    if (profile) {
+      setBasicInfo({
+        projectName: profile.projectName ?? "",
+        intervieweeName: profile.intervieweeName ?? "",
+        overview: profile.notes ?? "",
+      });
     }
 
-    setBasicInfo({
-      projectName: profile.projectName ?? "",
-      intervieweeName: profile.intervieweeName ?? "",
-      overview: profile.notes ?? "",
-    });
+    // 必须走 goToStep：它同时 setStep + router.replace。只 replace 不改本地 step，
+    // 页面会停在 outline（见任务单 S1 / PRD Q4）。
+    if (initialStep === "outline") {
+      goToStep("route");
+    }
     // 只在挂载时读回一次（与 BUG-10 懒初始化同语义）：initialStep 只是这一次性判定的输入，
     // 后续 RSC 重渲染带来的 prop 变化不该触发第二次回填，否则分流步往返时会拿草稿去盖
     // 用户刚在 state 里改的值。依赖数组故留空。
@@ -91,7 +105,7 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
     router.replace(`/projects/new?step=${next}`);
   }
 
-  // 返回：basic 步是流程入口，回首页；其余步回上一步。
+  // 返回：basic 步是流程入口，回首页；其余步回上一步（route → basic，outline → route）。
   // 回退也走 goToStep（而不是裸 setStep）—— 它同时 router.replace 同步 URL，
   // 否则地址栏仍停在旧 step，一次刷新就被弹回原来的步骤。
   function handleBack() {
@@ -99,7 +113,7 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
       router.push("/");
       return;
     }
-    goToStep(step === "outline" ? "basic" : "outline");
+    goToStep(step === "route" ? "basic" : "route");
   }
 
   // REQ-21 §5.2：基本信息不是「只活在 React state」，点下一步时写进既有草稿。
@@ -126,6 +140,66 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
       // IMPL §3.3 裁决：描述信息 → notes；researchFocus 不由基本信息写入。
       ...(notes ? { notes } : {}),
     });
+  }
+
+  // REQ-36：建项逻辑从 route-chooser 迁到流程容器 —— 提纲是 AI 分支的终局步，
+  // 用户在这里点「确认提纲，开始访谈」才建项目（步骤顺序 basic → route → outline）。
+  // 契约不变：POST /api/projects/ai-interview 仍要求提纲 + 项目名 + 受访对象。
+  async function createAiInterviewProject() {
+    if (isCreating) {
+      return;
+    }
+
+    const draft = readOutlineDraftSession();
+    const markdown = draft?.outlineMarkdown?.trim() ?? "";
+    const profile = draft?.profile;
+
+    if (
+      !profile ||
+      !markdown ||
+      !profile.projectName.trim() ||
+      !profile.intervieweeName.trim()
+    ) {
+      setOutlineError("提纲或基本信息不完整，请返回上一步补填。");
+      return;
+    }
+
+    setIsCreating(true);
+    setOutlineError("");
+
+    try {
+      const response = await fetch("/api/projects/ai-interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        // 字段与 outline-plan-workspace.tsx 的建项请求逐项一致；
+        // 画像直接取 workspace 刚写回草稿的那一份（含用户在提纲步的编辑）。
+        body: JSON.stringify({
+          projectName: profile.projectName.trim(),
+          intervieweeName: profile.intervieweeName.trim(),
+          institutionName: profile.institutionName,
+          researchFocus: profile.researchFocus,
+          collectionScenario: profile.collectionScenario,
+          notes: profile.notes,
+          outlineDraftMarkdown: markdown,
+        }),
+      });
+
+      const payload = (await response
+        .json()
+        .catch(() => null)) as { project?: { id?: string }; message?: string } | null;
+      const projectId = payload?.project?.id;
+
+      if (!response.ok || !projectId) {
+        throw new Error(payload?.message ?? "创建项目失败");
+      }
+
+      router.push(`/projects/${projectId}/interview`);
+    } catch {
+      setOutlineError("创建项目失败，请重试。");
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   return (
@@ -196,7 +270,7 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
                 onChange={setBasicInfo}
                 onNext={() => {
                   persistBasicInfo(basicInfo);
-                  goToStep("outline");
+                  goToStep("route");
                 }}
               />
             </div>
@@ -211,17 +285,22 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
                   onContinue 取代它内部的 router.push，把「下一步」交给本容器。 */}
               <OutlinePlanWorkspace
                 embedded
+                initialMarkdown={outlineSeed}
                 initialTopic={basicInfo.projectName}
                 initialSubject={basicInfo.intervieweeName}
                 initialOverview={basicInfo.overview}
                 onContinue={() => {
-                  // workspace 的「确认 / 跳过」会用提纲表单的字段整体覆盖草稿
-                  // （saveOutlineDraftToSession 是重建而非 merge），这里把基本信息的
-                  // 三个字段写回去；markdown 与画像其余字段保持 workspace 刚写下的值。
-                  persistBasicInfo(basicInfo);
-                  goToStep("route");
+                  // workspace 已在 handleConfirm 里把 markdown + 表单画像整体写回草稿，
+                  // 这里直接建项（不再 persistBasicInfo：那会用基本信息步的旧值
+                  // 盖掉用户在提纲步刚改过的主题 / 受访者）。
+                  void createAiInterviewProject();
                 }}
               />
+              {outlineError ? (
+                <div className="mt-3 rounded-[1.4rem] border border-danger/20 bg-danger/8 px-4 py-3 text-sm leading-7 text-danger">
+                  {outlineError}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -229,7 +308,12 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
             <div id="new-step-route" className="min-w-0">
               <RouteChooser
                 basicInfo={basicInfo}
-                onBackToOutline={() => goToStep("outline")}
+                onSelectAi={() => {
+                  // REQ-36 Q2：种子的读取必须留在点击事件里。渲染期读 sessionStorage
+                  // 在 SSR 下必为空、客户端首帧却有值 ⇒ BUG-16 的 hydration mismatch 复发。
+                  setOutlineSeed(readOutlineDraftSession()?.outlineMarkdown ?? "");
+                  goToStep("outline");
+                }}
               />
             </div>
           ) : null}

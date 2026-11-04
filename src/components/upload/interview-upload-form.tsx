@@ -422,7 +422,9 @@ export function InterviewUploadForm() {
   const createProject = useProjectWorkspaceStore((state) => state.createProject);
   const isSubmitting = useProjectWorkspaceStore((state) => state.isSubmitting);
 
-  // 提纲草稿由 /projects/new/outline 带来：URL 只带 ?outline=1 标记位，提纲全文与画像都在 sessionStorage。
+  // 提纲草稿由新建流程的上传路径带来：URL 只带 ?outline=1 标记位，提纲全文与画像都在 sessionStorage。
+  // REQ-36 起该标记位语义 = 「来自新建流程（可能无提纲）」—— 分流步点「上传音频」会先清空
+  // 草稿 markdown，故这里的提纲可能为空串；画像字段不受影响，下方 flowMode 判定也不看 markdown。
   // 读取放在惰性初始化里而不是 effect 里 —— 同步 setState 的 effect 会触发级联渲染（lint 会报）。
   // 这个子树不会 SSR：useSearchParams 让它在最近的 Suspense 边界内退化成客户端渲染，
   // 所以首帧就能拿到草稿；typeof window 守卫只是防它以后变成动态渲染。
@@ -437,6 +439,8 @@ export function InterviewUploadForm() {
     prefill?.profile.projectName && prefill?.profile.intervieweeName,
   );
   // REQ-24 §4.1：新版分支（分流支路）的唯一开关 = 「带标记位」且「草稿就绪」。
+  // REQ-36 后不变：draftReady 只校验 profile 的项目名 / 受访者，与提纲 markdown 无关 ——
+  // 上传路径即使无提纲（markdown 被清空）也照常进 flowMode，行为零改动。
   // 必须同时要求标记位：裸 /upload、老书签、?outline=0 时 hasOutlineFlag 为 false，
   // 逐字走下面的原逻辑，旧版行为零变化。
   // 只看标记位不看草稿就绪会造出死路：必填字段没有 UI 可填，提交必被 validateStepOne 弹回

@@ -122,7 +122,7 @@ export function BasicInfoForm({ value, onChange, onNext }: BasicInfoFormProps) {
         {/* data-* 锚点面向回归脚本，比中文文案耐改（IMPL §3.3）。 */}
         <Button
           type="submit"
-          data-step-next="outline"
+          data-step-next="route"
           className="w-full justify-center sm:w-auto"
         >
           下一步
