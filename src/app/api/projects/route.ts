@@ -16,6 +16,7 @@ import {
   saveInterviewAudio,
   type SavedInterviewAudio,
 } from "@/lib/server/upload-store";
+import { isWritingTemplateKey } from "@/lib/writing-rules";
 import type { RedactionRule, UserType } from "@/lib/types/project";
 
 // 与 /api/outline/generate、/api/projects/ai-interview 保持同口径的 notes 上限。
@@ -131,6 +132,22 @@ export async function POST(request: Request) {
     const customRedactionRules = parseCustomRedactionRules(
       formData.get("customRedactionRules"),
     );
+    // REQ-32 Q4=400：未传 / 空串按缺省处理；传了非白名单值则明确拒绝。
+    const rawWritingTemplateKey = formData.get("writingTemplateKey");
+    const writingTemplateKey = isWritingTemplateKey(rawWritingTemplateKey)
+      ? rawWritingTemplateKey
+      : undefined;
+
+    if (
+      typeof rawWritingTemplateKey === "string" &&
+      rawWritingTemplateKey !== "" &&
+      !writingTemplateKey
+    ) {
+      return NextResponse.json(
+        { message: "写作模板类型不合法。" },
+        { status: 400 },
+      );
+    }
 
     if (!projectName) {
       return NextResponse.json(
@@ -196,6 +213,7 @@ export async function POST(request: Request) {
       confidentialityLevel,
       collectionPath,
       language: language || "cn",
+      writingTemplateKey,
       customRedactionRules,
       userId,
       userType,

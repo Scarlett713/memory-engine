@@ -3,6 +3,7 @@ import path from "path";
 import { nanoid } from "nanoid";
 
 import { buildCollectionPlan } from "@/lib/oral-history";
+import { isWritingTemplateKey } from "@/lib/writing-rules";
 import {
   quarantineFile,
   readJsonFile,
@@ -20,6 +21,7 @@ import {
   type RedactionRule,
   type SensitiveMark,
   type UserType,
+  type WritingTemplateKey,
 } from "@/lib/types/project";
 
 type CreateProjectInput = {
@@ -43,6 +45,7 @@ type CreateProjectInput = {
   language?: string;
   confidentialityLevel?: ConfidentialityLevel;
   collectionPath?: CollectionPath;
+  writingTemplateKey?: WritingTemplateKey;
 };
 
 function normalizeWorkflowCopy(
@@ -149,6 +152,10 @@ function normalizeProjectRecord(project: Partial<ProjectRecord>): ProjectRecord 
       : [],
     userType: project.userType || "institution",
     consentFormPath: project.consentFormPath || "",
+    // REQ-32 A：只保留白名单内的显式键；不补默认值（补默认会把存量项目写死成某一模板）。
+    writingTemplateKey: isWritingTemplateKey(project.writingTemplateKey)
+      ? project.writingTemplateKey
+      : undefined,
   };
 }
 
@@ -249,6 +256,7 @@ export async function createProject(
     privacyLevel: input.privacyLevel,
     confidentialityLevel: input.confidentialityLevel || "internal",
     collectionPath: input.collectionPath || "upload",
+    writingTemplateKey: input.writingTemplateKey,
     customRedactionRules: input.customRedactionRules,
     collectionPlan: buildCollectionPlan({
       scenario: input.collectionScenario,

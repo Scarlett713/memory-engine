@@ -11,7 +11,11 @@
 // 纯常量 + 纯函数：无 IO、无副作用，可被 route / server / 验收脚本直接引用。
 // 模板字面量一律顶格书写 —— 缩进会成为注入到 prompt 里的正文。
 
-import type { InterviewScenario, ProjectRecord } from "@/lib/types/project";
+import type {
+  InterviewScenario,
+  ProjectRecord,
+  WritingTemplateKey,
+} from "@/lib/types/project";
 
 // 05 要求「书面化、规范化、结构规范」，与档案级（要求保留全部口语特征）和
 // 传播级（允许较高强度润色）都冲突，故本期固定学术级。保留参数以便后续按项目放开。
@@ -19,13 +23,7 @@ export const OUTPUT_GRADE = "学术级";
 
 export type OutputGrade = "档案级" | "学术级" | "传播级";
 
-export type WritingTemplateKey =
-  | "tibet_aid"
-  | "local_chronicle"
-  | "enterprise_history"
-  | "biography"
-  | "family_memoir"
-  | "general";
+export type { WritingTemplateKey };
 
 export type WritingTemplate = {
   key: WritingTemplateKey;
@@ -240,7 +238,11 @@ export function buildWritingRules(input: WritingRulesInput): string {
 export function buildWritingRulesForProject(
   project: Pick<
     ProjectRecord,
-    "projectName" | "customScenarioLabel" | "collectionScenario" | "researchFocus"
+    | "projectName"
+    | "customScenarioLabel"
+    | "collectionScenario"
+    | "researchFocus"
+    | "writingTemplateKey"
   >,
 ): string {
   return buildWritingRules({
@@ -248,5 +250,18 @@ export function buildWritingRulesForProject(
     customScenarioLabel: project.customScenarioLabel,
     projectName: project.projectName,
     researchFocus: project.researchFocus,
+    templateKey: project.writingTemplateKey,
   });
+}
+
+/** REQ-32：模板键的唯一真值源（由 OUTLINE_WRITING_TEMPLATES 派生，避免第二份白名单） */
+export const WRITING_TEMPLATE_KEYS = Object.keys(
+  OUTLINE_WRITING_TEMPLATES,
+) as WritingTemplateKey[];
+
+export function isWritingTemplateKey(value: unknown): value is WritingTemplateKey {
+  return (
+    typeof value === "string" &&
+    (WRITING_TEMPLATE_KEYS as readonly string[]).includes(value)
+  );
 }

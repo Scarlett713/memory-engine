@@ -158,6 +158,15 @@ export type InterviewOccasion =
 
 export type ExpectedOutput = "text" | "audio" | "both";
 
+// REQ-32：写作模板键的类型真值源（逐字搬自 writing-rules.ts，避免反向依赖成环）。
+export type WritingTemplateKey =
+  | "tibet_aid"
+  | "local_chronicle"
+  | "enterprise_history"
+  | "biography"
+  | "family_memoir"
+  | "general";
+
 export type ProjectRecord = {
   id: string;
   projectName: string;
@@ -209,6 +218,8 @@ export type ProjectRecord = {
   language?: string;
   projectCode?: string;
   estimatedDuration?: number;
+  /** REQ-32：项目级写作模板键，仅建项时写入；缺省 = 不存在该键（走既有场景派生） */
+  writingTemplateKey?: WritingTemplateKey;
   versionHistory: VersionSnapshot[];
 };
 

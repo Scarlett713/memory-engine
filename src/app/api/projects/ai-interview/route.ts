@@ -7,6 +7,7 @@ import {
   parseEnumValue,
 } from "@/lib/server/enum";
 import { createProject, updateProject } from "@/lib/server/project-store";
+import { isWritingTemplateKey } from "@/lib/writing-rules";
 import type {
   ProjectRecord,
   RedactionRule,
@@ -47,6 +48,7 @@ type AiInterviewRequest = {
   confidentialityLevel?: unknown;
   customRedactionRules?: unknown;
   language?: unknown;
+  writingTemplateKey?: unknown;
 };
 
 function normalizeText(value: unknown) {
@@ -122,6 +124,21 @@ export async function POST(request: Request) {
       ALLOWED_COLLECTION_SCENARIOS,
       "urban_memory",
     );
+    // REQ-32 Q4=400：undefined / null / 空串按缺省处理；传了非白名单值则明确拒绝。
+    const writingTemplateKey = isWritingTemplateKey(payload.writingTemplateKey)
+      ? payload.writingTemplateKey
+      : undefined;
+
+    if (
+      payload.writingTemplateKey != null &&
+      payload.writingTemplateKey !== "" &&
+      !writingTemplateKey
+    ) {
+      return NextResponse.json(
+        { message: "写作模板类型不合法。" },
+        { status: 400 },
+      );
+    }
 
     if (!projectName) {
       return NextResponse.json(
@@ -162,6 +179,7 @@ export async function POST(request: Request) {
       audioMimeType: "application/octet-stream",
       audioSize: 0,
       collectionScenario,
+      writingTemplateKey,
       researchFocus: normalizeText(payload.researchFocus),
       privacyLevel: parseEnumValue(
         toEnumInput(payload.privacyLevel),
