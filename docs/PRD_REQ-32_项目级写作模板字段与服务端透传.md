@@ -192,11 +192,11 @@ export type { WritingTemplateKey }; // tsconfig 的 isolatedModules: true 要求
 
 | 方案 | 行为 | 评价 |
 | --- | --- | --- |
-| **A（建议）静默丢弃** | 非法 / 空串 ⇒ 该键不写入记录，HTTP 仍 `201` | 与既有 `parseEnumValue`（`enum.ts:16-23`：非法值**回退**而非 400）**同风格**；缺点：调用方拼错无感知 |
-| B 返回 400 | 非法值直接拒建 | 契约更严，但与同文件其它枚举字段（`collectionScenario` / `privacyLevel` / `collectionPath`）**不一致** |
+| ~~A 静默丢弃~~（**原推荐，已作废**） | 非法 / 空串 ⇒ 该键不写入记录，HTTP 仍 `201` | 与既有 `parseEnumValue`（`enum.ts:16-23`：非法值**回退**而非 400）**同风格**；缺点：调用方拼错无感知 |
+| **B 返回 400（现行口径）** | 非法值直接拒建 ⇒ `400`「写作模板类型不合法。」；**未传 / `null` / 空串仍按缺省处理**（`201`，记录中该键不存在） | 契约更严；与同文件其它枚举字段（`collectionScenario` / `privacyLevel` / `collectionPath`）的「回退」风格**不一致**，属**有意的例外** —— 模板决定成稿骨架，拼错即整篇跑偏 |
 | C 原样存 | 不做白名单 | 记录里留垃圾值、GET 会回显给未来 UI ⇒ 拒绝 |
 
-**推荐 A**，并要求把「非法值 ⇒ 记录中该键不存在」写成断言（AC-4）。
+> **⚖️ Q4 改裁（2026-11-07 总管；原 PRD 推荐 A「静默丢弃 ＋ 201」作废）**：非法 `writingTemplateKey` ⇒ **`400`「写作模板类型不合法。」**，且**记录不落库**。AC-4 判据据此改为「`400` ＋ 不落库」；实现落点 `src/app/api/projects/route.ts:140-149`（FormData 入口）与 `src/app/api/projects/ai-interview/route.ts:131-142`（JSON 入口），两处同文案同码。
 
 实现注意：`parseEnumValue` 的签名是 `(value, allowed, fallback: T): T`，**不能**直接复用（本字段缺省必须是 `undefined`，不能是某个默认键）。两条路：
 - 在 route 内联：`const raw = formData.get("writingTemplateKey"); const writingTemplateKey = isWritingTemplateKey(raw) ? raw : undefined;`
@@ -329,7 +329,7 @@ writingTemplateKey: isWritingTemplateKey(project.writingTemplateKey)
 | **AC-1** | 类型零回归 | `npx tsc --noEmit` **0 error**；`npx eslint src` 与基线一致（当前存量 6 项，不得增加） |
 | **AC-2** | 上传路径写入 | `POST /api/projects`（multipart）带 `writingTemplateKey=general` ⇒ `201` 且落库记录**含**该键（`general`） |
 | **AC-3** | AI 访谈路径写入 | `POST /api/projects/ai-interview`（JSON）带该键 ⇒ `201` 且记录含该键；若 Q1 裁「不做」，本 AC 改为「已知缺口登记」并同步登记表 |
-| **AC-4** | 非法值丢弃 | 带 `writingTemplateKey=nope`（或空串）⇒ `201` 且记录中**不存在**该键（不是 `null`、不是 `biography`） |
+| **AC-4** | 非法值 ⇒ `400`（Q4 改裁；原「静默丢弃 201」作废） | 带 `writingTemplateKey=nope` ⇒ `400` ＋ `message` = 「写作模板类型不合法。」＋ **记录不落库**；未传 / `null` / 空串 ⇒ `201` 且记录中**不存在**该键（不是 `null`、不是 `biography`） |
 | **AC-5** | 旧 JSON 兼容 | 对 `storage/projects.json` 全量记录跑 `normalizeProjectRecord`：输出**不含**该键；且「无键 × 6 场景」的 `resolveWritingTemplate` 结果与改动前**逐字相同**（比对 `name` + `chapters`） |
 | **AC-6** | 透传接通 | `buildWritingRulesForProject({ collectionScenario: "urban_memory", writingTemplateKey: "general", … })` 输出含「本项目适用模板：通用访谈类。」＋ 3 条章标题，且**不含**五章字面 |
 | **AC-7** | 优先级不变 | `custom` + 项目名含「公司」+ 键 `general` ⇒ 仍 `general`（显式键压过关键词兜底）；键 `nope` ⇒ 回落地方史志（与探针 `:574-579` 同口径） |
@@ -390,7 +390,7 @@ writingTemplateKey: isWritingTemplateKey(project.writingTemplateKey)
 | **Q1** | 是否本批覆盖 `POST /api/projects/ai-interview` | **覆盖** | 不覆盖则 G1 只成立一半；且登记表「5 处触点」需同步更正为 6 处 |
 | **Q2** | 是否给 `enum.ts` 新增 `parseOptionalEnumValue` | **不新增**，在 route 内联判断 | `enum.ts` 是共用防御层，动它影响面大于收益 |
 | **Q3** | `isWritingTemplateKey` 守卫放哪 | **`writing-rules.ts` 导出**（单一真值源） | 属**新增导出**，须总管在解冻范围里点名；备选 `project-store.ts` 本地（0 新导出但有脱钩风险） |
-| **Q4** | 非法值语义：静默丢弃 vs 400 | **静默丢弃（201）** | 与 `parseEnumValue` 既有风格一致（§4.4） |
+| **Q4** | 非法值语义：静默丢弃 vs 400 | **400「写作模板类型不合法。」（2026-11-07 总管改裁；原推荐「静默丢弃 201」作废）** | 实现与 PRD §4.4 已按 400 收敛（v2.36 回写）；未传 / `null` / 空串仍按缺省 201 |
 | **Q5** | 是否为 U1（模板快照）预立编号 | **不预立** | 无写入方、无消费方，预立等于冻结未定语义 |
 | **Q6** | 是否让 `PATCH` 支持改模板 | **不做** | 牵出「改后是否重跑整理 / 旧稿怎么办」，须与 REQ-23 一并裁 |
 
