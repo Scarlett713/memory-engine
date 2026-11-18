@@ -1189,6 +1189,21 @@ export function InterviewConsole({ project }: InterviewConsoleProps) {
                 </div>
               ) : null}
 
+              {/* UI-32：作答态固定显示当前问题 —— 总管 2026-11-18 裁决：带题号、
+                  限 2 行截断不折叠、固定在字幕卡上方且不随字幕滚动。
+                  只读 state，不新增 action；形态对齐 ai_asking / paused。 */}
+              <div className="surface-card rounded-[1.55rem] px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="section-eyebrow">当前问题</p>
+                  <div className="tape-label">
+                    第 {state.questionIndex + 1} / {questionTotal} 题
+                  </div>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-foreground">
+                  {state.currentQuestion || "（等待 AI 提问）"}
+                </p>
+              </div>
+
               {/* Step 3 已接入 Web Speech；「暂停滚动 / 清屏（仅视图）」仍待补。 */}
               <div className="surface-card soft-scroll min-h-[14rem] whitespace-pre-wrap rounded-[1.55rem] px-4 py-4 text-sm leading-7 text-foreground">
                 {captionText || (
