@@ -270,6 +270,7 @@ const CONSENT_DOC_BLOCKS: ConsentDocBlock[] = [
 function ConsentDialog({
   open,
   checked,
+  submitting,
   onCheckedChange,
   onConfirm,
   onCancel,
@@ -278,6 +279,7 @@ function ConsentDialog({
 }: {
   open: boolean;
   checked: boolean;
+  submitting: boolean;
   onCheckedChange: (checked: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -446,7 +448,7 @@ function ConsentDialog({
             <Button
               type="button"
               className="w-full justify-center sm:w-auto sm:min-w-[140px]"
-              disabled={!checked}
+              disabled={!checked || submitting}
               onClick={onConfirm}
             >
               {CONSENT_BUTTON_LABEL}
@@ -550,6 +552,15 @@ export function InterviewUploadForm() {
   // 展开态受控：与勾选态同址复位，保证每次重弹都是收起态（UI-06 PRD §4.5 第 4 条）。
   const [consentDocOpen, setConsentDocOpen] = useState(false);
 
+  // BUG-18：在途锁。用 ref 不用 state —— 同一 tick 里的第二次点击读到的必须是最新值，
+  // 而 state 要等本轮渲染提交后才可见，挡不住 btn.click(); btn.click(); 这种同 tick 双派发
+  // （弹窗按钮尤其明显：setConsentOpen(false) 得等下一次渲染才把节点摘掉）。
+  // 只锁「请求本身」：前置校验的早退分支不发请求，不能占锁（PRD §0.3 C1）。
+  const submitInFlightRef = useRef(false);
+  // BUG-18 P6：卸载标记。router.push 之后本组件会被卸载，而 submitProject 的 catch 还要
+  // setError —— 卸载后不再 setState。
+  const isMountedRef = useRef(true);
+
   const [error, setError] = useState<string | null>(null);
 
   const [outlineDraftMarkdown, setOutlineDraftMarkdown] = useState(
@@ -572,6 +583,16 @@ export function InterviewUploadForm() {
       clearOutlineDraftFromSession();
     }
   }, [hasOutlineFlag]);
+
+  // BUG-18 P6：effect 体内先置 true、清理时置 false —— dev 的 StrictMode 是
+  // 「挂载 → 清理 → 再挂载」，只在清理里置 false 会让重挂之后的守卫永久失效。
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const helperText = useMemo(() => {
     if (!audioFile) {
@@ -674,6 +695,11 @@ export function InterviewUploadForm() {
   // 旧版向导（裸 /upload、?outline=1 但草稿不就绪）逐字不变：step > 1 时「上一步」照常出现。
 
   async function submitProject() {
+    // BUG-18 P2：主锁 —— 已有一次 POST 在飞，任何来源的第二次调用直接丢弃。
+    if (submitInFlightRef.current) {
+      return;
+    }
+
     if (!audioFile) {
       setError("请先选择一段受访音频。");
       return;
@@ -687,6 +713,10 @@ export function InterviewUploadForm() {
       setStep(1);
       return;
     }
+
+    // BUG-18 P2/P3：校验全过、马上要发请求 —— 这里才取锁（两条早退都不占锁，C1）；
+    // 释放统一走下面的 finally，成功（已跳转）与失败（要能重试）两条路都解锁。
+    submitInFlightRef.current = true;
 
     try {
       setError(null);
@@ -715,16 +745,31 @@ export function InterviewUploadForm() {
       // 注意：这里不要加 router.refresh()——与 push 同 tick 调用会吞掉跳转
       router.push(`/projects/${project.id}?autostart=1`);
     } catch (submitError) {
+      // BUG-18 P6：已经跳走（组件卸载）就不再 setError，避免对已卸载组件 setState。
+      // 用 return 而不是把 setError 包进 if —— finally 照样执行，锁不会漏放。
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setError(
         submitError instanceof Error
           ? submitError.message
           : "上传失败，请稍后重试。",
       );
+    } finally {
+      // BUG-18 P3：成功路径已跳转、失败路径要允许重试 —— 两条路都必须解锁。
+      submitInFlightRef.current = false;
     }
   }
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    // BUG-18 P2：次守卫 —— 请求还没回来之前，任何再次触发的 submit 一律丢弃。
+    // 必须留在 preventDefault() 之后：早退时漏了它，浏览器会走原生表单提交，整页刷新。
+    if (submitInFlightRef.current) {
+      return;
+    }
 
     if (step < 3) {
       goNext();
@@ -748,6 +793,12 @@ export function InterviewUploadForm() {
   }
 
   function handleConsentConfirm() {
+    // BUG-18 P2/P4：「同意并继续」是本页唯一真正发请求的按钮。setConsentOpen(false) 要等
+    // 下一次渲染才把弹窗摘掉，同一 tick 里的第二次点击仍打在这个还活着的 DOM 节点上。
+    if (submitInFlightRef.current) {
+      return;
+    }
+
     setConsentOpen(false);
     void submitProject();
   }
@@ -1276,6 +1327,7 @@ export function InterviewUploadForm() {
       <ConsentDialog
         open={consentOpen}
         checked={consentChecked}
+        submitting={isSubmitting}
         onCheckedChange={setConsentChecked}
         onConfirm={handleConsentConfirm}
         onCancel={handleConsentCancel}
