@@ -45,7 +45,52 @@ import type {
 import { useProjectWorkspaceStore } from "@/store/project-workspace";
 import { useAuth } from "@/hooks/useAuth";
 
-const acceptedAudioExtensions = ".mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,audio/*";
+const acceptedAudioExtensions = ".mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4";
+// UI-33：格式白名单 —— 扩展名集合与 src/lib/server/upload-store.ts:14-22 逐项一致。
+// 服务端那份是模块私有（未导出），本批既不导出它、也不改那个文件，
+// 客户端另存一份同口径常量，靠注释锁住「两处必须同步」。
+// webm 刻意不在其中：它只走 AI 访谈录音链路（interview/audio），不经本表单。
+const allowedAudioExtensions = new Set([
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".aac",
+  ".flac",
+  ".ogg",
+  ".mp4",
+]);
+// MIME 白名单只列上面 7 种格式的常见取值 —— 不用通配：
+// 通配会把 audio/webm 一并放行，与「webm 不入客户端白名单」的裁决冲突（本 PRD §0.3 C2）。
+const allowedAudioMimeTypes = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/ogg",
+]);
+// 文案逐字复用 upload-store.ts:59，前后端对用户只留一句话。
+const audioFormatError = "仅支持常见音频文件格式上传。";
+
+function getFileExtension(fileName: string) {
+  const dot = fileName.lastIndexOf(".");
+  return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+}
+
+// 与服务端同构的两点判定：扩展名或 MIME 任一命中即放行 —— 即 upload-store.ts:55-60
+// （!isAudioMime && !allowedExtensions.has(extension)）取反。
+// 保留「或」的理由：部分系统 / 浏览器给不出 file.type（空串）或给非标准值，
+// 只认 MIME 会误伤合法 .m4a / .wav；只认扩展名又挡不住无扩展名的伪装文件。
+function hasSupportedAudioFormat(file: File) {
+  return (
+    allowedAudioExtensions.has(getFileExtension(file.name)) ||
+    allowedAudioMimeTypes.has(file.type.split(";")[0].trim().toLowerCase())
+  );
+}
 // 与 src/lib/server/upload-store.ts 的 100MB 业务上限同口径（那边是既有实现，本批不动）：
 // 选文件时就挡一道，超限文件不必白跑一次 multipart 上传才被拒。
 const maxAudioBytes = 100 * 1024 * 1024;
@@ -549,6 +594,16 @@ export function InterviewUploadForm() {
       return;
     }
 
+    // UI-33：格式在「选文件」这一步就判 —— 与上面 100MB 同理，不必等用户勾完知情同意、
+    // 白跑一次 multipart 才被服务端 400 打回。判定口径见 hasSupportedAudioFormat。
+    if (nextFile && !hasSupportedAudioFormat(nextFile)) {
+      setAudioFile(null);
+      setError(audioFormatError);
+      // 同 100MB 分支：不清 input.value 的话，重选同一个非法文件不会触发 change。
+      event.target.value = "";
+      return;
+    }
+
     setAudioFile(nextFile);
     setError(null);
   }
@@ -673,6 +728,16 @@ export function InterviewUploadForm() {
 
     if (step < 3) {
       goNext();
+      return;
+    }
+
+    // UI-33：第二道 —— accept 只过滤选择框，拖拽 / 程序化构造的 File 能绕过去；
+    // 这里在打开知情同意弹窗之前再判一次，避免用户勾完「同意并继续」才被服务端 400 打回。
+    // 无文件时不拦：空文件提示仍由 submitProject（:622-625）给，且 verify-phase3 的
+    // I2 / I3 两臂就是「不选文件直接开弹窗」，拦掉会把既有验收面打红（PRD §0.3 C1）。
+    if (audioFile && !hasSupportedAudioFormat(audioFile)) {
+      setAudioFile(null);
+      setError(audioFormatError);
       return;
     }
 
