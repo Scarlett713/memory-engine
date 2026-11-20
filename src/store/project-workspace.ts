@@ -9,6 +9,7 @@ import type {
   PrivacyLevel,
   ProjectRecord,
   RedactionRule,
+  WritingTemplateKey,
 } from "@/lib/types/project";
 
 type CreateProjectPayload = {
@@ -26,6 +27,8 @@ type CreateProjectPayload = {
   collectionPath: CollectionPath;
   customRedactionRules: RedactionRule[];
   language: string;
+  /** REQ-33：缺省 = 不套模板（不写 FormData 键 ⇒ 服务端按场景派生）。 */
+  writingTemplateKey?: WritingTemplateKey;
 };
 
 type ProjectWorkspaceState = {
@@ -92,6 +95,10 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>(
       formData.set("confidentialityLevel", payload.confidentialityLevel);
       formData.set("collectionPath", payload.collectionPath);
       formData.set("language", payload.language || "cn");
+      // REQ-33：缺省不发键。空串 / 非法值都不写 —— 服务端只对「非空且非白名单」返回 400。
+      if (payload.writingTemplateKey) {
+        formData.set("writingTemplateKey", payload.writingTemplateKey);
+      }
       formData.set(
         "customRedactionRules",
         JSON.stringify(payload.customRedactionRules),

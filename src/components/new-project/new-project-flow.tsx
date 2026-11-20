@@ -11,6 +11,10 @@ import {
 import { RouteChooser } from "@/components/new-project/route-chooser";
 import { OutlinePlanWorkspace } from "@/components/outline/outline-plan-workspace";
 import {
+  WritingTemplateSelect,
+  type WritingTemplateSelection,
+} from "@/components/ui/writing-template-select";
+import {
   readOutlineDraftSession,
   saveOutlineDraftToSession,
 } from "@/lib/outline-session";
@@ -65,6 +69,10 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
   const [outlineSeed, setOutlineSeed] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [outlineError, setOutlineError] = useState("");
+  // REQ-33：缺省「不套模板」= 不发送 writingTemplateKey。初值只能是空串 ——
+  // 渲染期读 sessionStorage 会让首帧客户端与 SSR 不同值（BUG-16 hydration 陷阱）。
+  const [writingTemplateKey, setWritingTemplateKey] =
+    useState<WritingTemplateSelection>("");
 
   useEffect(() => {
     // 与 BUG-10 同范围：只在分流步冷启动回填（IMPL §6-Q1 取 B，不扩大到 basic）。
@@ -182,6 +190,7 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
           collectionScenario: profile.collectionScenario,
           notes: profile.notes,
           outlineDraftMarkdown: markdown,
+          ...(writingTemplateKey ? { writingTemplateKey } : {}),
         }),
       });
 
@@ -283,6 +292,14 @@ export function NewProjectFlow({ initialStep }: { initialStep?: string }) {
             >
               {/* embedded：去掉工作台自带的整页外壳与 header，只留表单与提纲本体；
                   onContinue 取代它内部的 router.push，把「下一步」交给本容器。 */}
+              {/* REQ-33：模板选择放在提纲步、工作台**之外** —— 不碰 outline-plan-workspace.tsx，
+                  也不进它的滚动区；framed 只加 surface-card（不加 paper-panel，见 :263 注释）。 */}
+              <WritingTemplateSelect
+                id="writing-template-key"
+                framed
+                value={writingTemplateKey}
+                onChange={setWritingTemplateKey}
+              />
               <OutlinePlanWorkspace
                 embedded
                 initialMarkdown={outlineSeed}

@@ -24,6 +24,10 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
+  WritingTemplateSelect,
+  type WritingTemplateSelection,
+} from "@/components/ui/writing-template-select";
+import {
   clearOutlineDraftFromSession,
   OUTLINE_FLAG_PARAM,
   readOutlineDraftSession,
@@ -546,6 +550,10 @@ export function InterviewUploadForm() {
 
   // ── Step 3 音频与提交 ────────────────────────────────────
   const [language, setLanguage] = useState("cn");
+  // REQ-33：缺省「不套模板」= 不发送 writingTemplateKey（服务端按采集场景派生）。
+  // 初值只能是空串：不从 sessionStorage / 草稿读回（BUG-16：SSR 与首帧客户端必须同值）。
+  const [writingTemplateKey, setWritingTemplateKey] =
+    useState<WritingTemplateSelection>("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
   // 弹窗开关：Step 3 点「创建项目」时才开，关闭即作废，不落任何存储。
@@ -744,6 +752,7 @@ export function InterviewUploadForm() {
         collectionPath,
         customRedactionRules,
         language,
+        ...(writingTemplateKey ? { writingTemplateKey } : {}),
       });
 
       // 草稿已经进了项目档案，清掉 sessionStorage 里的副本，避免下次上传串味。
@@ -1225,6 +1234,12 @@ export function InterviewUploadForm() {
                   ))}
                 </select>
               </div>
+
+              <WritingTemplateSelect
+                id="writingTemplateKey"
+                value={writingTemplateKey}
+                onChange={setWritingTemplateKey}
+              />
 
               <div className="surface-card flex flex-col rounded-[1.55rem] p-4">
                 <div className="flex items-center justify-between gap-3">
