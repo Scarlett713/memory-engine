@@ -104,8 +104,9 @@ export const OUTLINE_WRITING_TEMPLATES: Record<
   },
 };
 
-// 兜底模板：07 的「人物传记类」骨架最通用（生平 → 节点 → 成就 → 人际 → 感悟）。
-export const FALLBACK_WRITING_TEMPLATE_KEY: WritingTemplateKey = "biography";
+// 兜底模板：改用「通用访谈类」（3 章）—— 自定义场景没有命中关键词、或采集场景是枚举外非法值时，
+// 落通用骨架而不是人物传记骨架（biography 的「生平履历」假设对多数自定义场景并不成立）。
+export const FALLBACK_WRITING_TEMPLATE_KEY: WritingTemplateKey = "general";
 
 // 枚举 → 模板：07 只有 5 类，InterviewScenario 有 6 个值，故城市记忆 / 红色记忆 /
 // 非遗传承三类落到「地方史志类」—— 07 的「记录主题」原文即含历史变迁、红色记忆、非遗民俗。
