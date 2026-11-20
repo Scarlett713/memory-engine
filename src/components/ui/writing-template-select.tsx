@@ -9,8 +9,9 @@ import {
  *
  * - 选项来源唯一：OUTLINE_WRITING_TEMPLATES（writing-rules.ts:35-105）/ WRITING_TEMPLATE_KEYS（:257-260）。
  *   顺序 = 常量声明顺序（援藏 → 地方史志 → 企业发展史 → 人物传记 → 家族回忆录 → 通用）。
- * - 空串 = 「不套模板（自由输出）」⇒ 调用方**不发送** writingTemplateKey ⇒ 服务端按采集场景派生，
- *   与 REQ-33 之前逐字等价（API 对缺省 / 空串都按缺省处理：route.ts:135-150）。
+ * - 空串 = 「系统自动匹配（推荐）」⇒ 调用方**不发送** writingTemplateKey ⇒ 服务端按采集场景
+ *   （custom 走关键词 + 兜底 general）派生，与 REQ-33 之前逐字等价
+ *   （API 对缺省 / 空串都按缺省处理：route.ts:135-150）。
  * - 章数写进选项文本、章标题进 title：不额外占高度，也不复制模板字面（逐字照抄由 writing-rules 负责）。
  */
 export type WritingTemplateSelection = WritingTemplateKey | "";
@@ -25,7 +26,7 @@ type WritingTemplateSelectProps = {
   framed?: boolean;
 };
 
-export const NO_WRITING_TEMPLATE_LABEL = "不套模板（自由输出）";
+export const NO_WRITING_TEMPLATE_LABEL = "系统自动匹配（推荐）";
 
 export function WritingTemplateSelect({
   id,
