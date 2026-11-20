@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -560,6 +561,11 @@ export function InterviewUploadForm() {
   // BUG-18 P6：卸载标记。router.push 之后本组件会被卸载，而 submitProject 的 catch 还要
   // setError —— 卸载后不再 setState。
   const isMountedRef = useRef(true);
+  // BUG-19：导航在途。router.push 只负责「发起」导航，页面要等目标路由渲染完才切走
+  // （dev 实测 POST 201 之后仍有约 2s 停在 /upload）。这段时间 store 的 isSubmitting
+  // 已经复位，按钮会变回「开始处理」；用 transition 的 isPending 把这段也标成提交中，
+  // 按钮视觉与可点性才不会在请求成功后、页面切走前回弹。
+  const [isNavigating, startNavigate] = useTransition();
 
   const [error, setError] = useState<string | null>(null);
 
@@ -715,8 +721,9 @@ export function InterviewUploadForm() {
     }
 
     // BUG-18 P2/P3：校验全过、马上要发请求 —— 这里才取锁（两条早退都不占锁，C1）；
-    // 释放统一走下面的 finally，成功（已跳转）与失败（要能重试）两条路都解锁。
+    // 失败路径走 finally 解锁；成功路径（BUG-19）保持锁住到组件卸载。
     submitInFlightRef.current = true;
+    let navigationStarted = false;
 
     try {
       setError(null);
@@ -743,7 +750,12 @@ export function InterviewUploadForm() {
       clearOutlineDraftFromSession();
 
       // 注意：这里不要加 router.refresh()——与 push 同 tick 调用会吞掉跳转
-      router.push(`/projects/${project.id}?autostart=1`);
+      // BUG-19：放进 transition —— isNavigating 会一直为 true 到新路由提交，
+      // 期间按钮保持「上传中…」且 disabled（见下方 submit 按钮与锁的释放条件）。
+      startNavigate(() => {
+        router.push(`/projects/${project.id}?autostart=1`);
+      });
+      navigationStarted = true;
     } catch (submitError) {
       // BUG-18 P6：已经跳走（组件卸载）就不再 setError，避免对已卸载组件 setState。
       // 用 return 而不是把 setError 包进 if —— finally 照样执行，锁不会漏放。
@@ -757,8 +769,13 @@ export function InterviewUploadForm() {
           : "上传失败，请稍后重试。",
       );
     } finally {
-      // BUG-18 P3：成功路径已跳转、失败路径要允许重试 —— 两条路都必须解锁。
-      submitInFlightRef.current = false;
+      // BUG-18 P3：失败路径必须解锁，否则按钮永久卡死。
+      // BUG-19：成功路径不再解锁 —— 项目已经建出来，从请求返回到组件卸载之间的
+      // 这段窗口（dev 实测约 2s）若放行，再点一次就是第二个项目；导航完成后
+      // 本组件卸载，下一次挂载拿到的是全新的 ref，无需手动复位。
+      if (!navigationStarted) {
+        submitInFlightRef.current = false;
+      }
     }
   }
 
@@ -1305,9 +1322,9 @@ export function InterviewUploadForm() {
               <Button
                 type="submit"
                 className="w-full justify-center sm:w-auto sm:min-w-[220px]"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isNavigating}
               >
-                {isSubmitting ? (
+                {isSubmitting || isNavigating ? (
                   <>
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     上传中…
@@ -1327,7 +1344,7 @@ export function InterviewUploadForm() {
       <ConsentDialog
         open={consentOpen}
         checked={consentChecked}
-        submitting={isSubmitting}
+        submitting={isSubmitting || isNavigating}
         onCheckedChange={setConsentChecked}
         onConfirm={handleConsentConfirm}
         onCancel={handleConsentCancel}
