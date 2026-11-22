@@ -36,7 +36,11 @@ export function WritingTemplateSelect({
 }: WritingTemplateSelectProps) {
   return (
     <div
-      className={framed ? "surface-card shrink-0 rounded-[1.4rem] px-3 py-3 sm:px-4" : undefined}
+      className={
+        framed
+          ? "paper-panel paper-panel-strong mb-2 shrink-0 rounded-[1.55rem] p-4"
+          : undefined
+      }
     >
       <label className="field-label" htmlFor={id}>
         写作模板
