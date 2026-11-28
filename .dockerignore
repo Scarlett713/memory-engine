@@ -1,7 +1,13 @@
 # 依赖与构建缓存（容器内会重新安装/构建）
 node_modules
 .next
+.next-dev
 out
+
+# 本地打包/交付副本：内含整份 src 与 .env.local 的拷贝，
+# 进了构建上下文会让 `next build` 的 TypeScript 检查扫到旧代码而失败。
+_delivery
+*.zip
 
 # 版本控制
 .git
